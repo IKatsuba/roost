@@ -1,5 +1,7 @@
 # Roost
 
+[![ci](https://github.com/IKatsuba/roost/actions/workflows/ci.yml/badge.svg)](https://github.com/IKatsuba/roost/actions/workflows/ci.yml)
+
 A native macOS workspace for [Claude Code](https://claude.com/claude-code)
 sessions: projects, tabs, a tree of terminal panes, agent statuses and a command
 palette.
