@@ -14,7 +14,10 @@ a human come first.
 The terminal is [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm);
 everything else is written here.
 
-![Roost: projects in the sidebar, sessions as tabs, an agent at work in the pane and the attention queue on the right](docs/screenshot.png)
+![The Roost window: two projects in the sidebar, three sessions as tabs, a split of two agent panes, and the attention queue on the right holding two questions waiting for an answer](docs/screenshot.png)
+
+The marks say who is where: solid for an agent stuck on a question, stripes for
+one at work, a checker for finished, an outline for at rest.
 
 ## What it does
 
