@@ -176,7 +176,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // itself.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(Palette.chrome)
+        // The dynamic NSColor, not one squeezed through SwiftUI: the window
+        // has to repaint itself when the system appearance changes.
+        window.backgroundColor = Palette.chromeColor
 
         // The window bar holds only the path and the view switch. Nothing that
         // changes from session to session: sessions live one row below, in

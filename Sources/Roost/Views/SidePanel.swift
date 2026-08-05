@@ -217,7 +217,7 @@ private struct FeedRow: View {
     private var colour: Color {
         switch entry.status {
         case .waiting: Palette.danger
-        case .done: Palette.ok
+        case .done: Palette.text
         default: Palette.muted
         }
     }
@@ -279,7 +279,7 @@ private struct QueueCard: View {
                     } label: {
                         Text("handled ✓")
                             .font(Typography.label)
-                            .foregroundStyle(Palette.ok)
+                            .foregroundStyle(Palette.text)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
                             .overlay(

@@ -1,60 +1,128 @@
+import AppKit
 import RoostCore
 import SwiftUI
 
-/// The look of the interface.
+/// The look of the interface — the same one katsuba.dev wears.
 ///
-/// The chrome deliberately does not look like "an app around a terminal": the
-/// same monospaced font, the same density, no rounded corners, shadows or
-/// fills. Project names are directory names, tabs are processes; setting them
-/// in a proportional font would be a lie.
+/// The palette is the site's neutral scale, converted from its oklch tokens:
+/// one ground, one text colour, two greys between them, and hairlines. Fills
+/// carry no meaning here; borders separate things, exactly as they do on the
+/// site.
+///
+/// One colour survives the monochrome, and it means one thing: an agent that
+/// cannot move without a human. Everything else — working, done, idle — is told
+/// apart by weight, the way the site tells its own states apart.
 enum Palette {
-    /// The panes are darker than the terminal itself, so that output stays
-    /// lighter than the chrome and draws the eye.
-    static let chrome = Color(red: 0x16 / 255, green: 0x16 / 255, blue: 0x1A / 255)
-    static let terminal = Color(red: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255)
+    /// A colour that follows the system appearance.
+    ///
+    /// `NSColor` resolves it per view rather than per launch, so light and dark
+    /// need no reload and no switch of our own — which is the whole reason the
+    /// tokens are `NSColor` and not `Color`.
+    private static func dynamic(light: Int, dark: Int, alpha: Double = 1) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let hex = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+            return NSColor(
+                srgbRed: Double((hex >> 16) & 0xFF) / 255,
+                green: Double((hex >> 8) & 0xFF) / 255,
+                blue: Double(hex & 0xFF) / 255,
+                alpha: alpha
+            )
+        }
+    }
 
-    /// Darker than the chrome still — the session bar, so that it reads as a
-    /// backing under the tabs rather than as one more panel.
-    static let sunken = Color(red: 0x12 / 255, green: 0x12 / 255, blue: 0x15 / 255)
+    // MARK: - Grounds
 
-    /// Hairlines instead of borders and shadows.
-    static let line = Color(red: 0x26 / 255, green: 0x26 / 255, blue: 0x2B / 255)
+    /// The ground everything stands on. The panes and the chrome share it: on
+    /// the site nothing is separated by a fill, only by a line.
+    static let chromeColor = dynamic(light: 0xFFFFFF, dark: 0x0A0A0A)
+    static let chrome = Color(nsColor: chromeColor)
+    static let terminal = Color(nsColor: chromeColor)
 
-    /// The highlight of the row under the cursor — the only fill in the
-    /// interface.
-    static let lineSoft = Color(red: 0x1F / 255, green: 0x1F / 255, blue: 0x24 / 255)
+    /// One step off the ground — the session bar, so that it reads as a backing
+    /// under the tabs.
+    static let sunken = Color(nsColor: dynamic(light: 0xFAFAFA, dark: 0x171717))
 
-    static let text = Color(red: 0xC6 / 255, green: 0xC6 / 255, blue: 0xC1 / 255)
-    static let muted = Color(red: 0x6A / 255, green: 0x6A / 255, blue: 0x71 / 255)
-    static let faint = Color(red: 0x44 / 255, green: 0x44 / 255, blue: 0x4A / 255)
+    /// The fill under the cursor, and the only fill in the interface.
+    static let lineSoft = Color(nsColor: dynamic(light: 0xF5F5F5, dark: 0x262626))
 
-    /// The only accent — dusty blue. Used to mark the active element and for
-    /// nothing else.
-    static let accent = Color(red: 0x7F / 255, green: 0xA6 / 255, blue: 0xC4 / 255)
-
-    static let danger = Color(red: 0xC9 / 255, green: 0x7A / 255, blue: 0x6E / 255)
-
-    /// Muted green — only for "done, but unread".
-    static let ok = Color(red: 0x8F / 255, green: 0xA8 / 255, blue: 0x8A / 255)
-
-    static let terminalBackground = NSColor(
-        srgbRed: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255, alpha: 1
+    /// Hairlines instead of borders and shadows. In the dark the site uses
+    /// white at a tenth, not a grey — it keeps the line from going muddy over
+    /// the near-black ground.
+    static let line = Color(
+        nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(white: 1, alpha: 0.1)
+                : NSColor(srgbRed: 0.898, green: 0.898, blue: 0.898, alpha: 1)
+        }
     )
-    static let terminalForeground = NSColor(
-        srgbRed: 0xC6 / 255, green: 0xC6 / 255, blue: 0xC1 / 255, alpha: 1
-    )
+
+    // MARK: - Type
+
+    static let textColor = dynamic(light: 0x0A0A0A, dark: 0xFAFAFA)
+    static let text = Color(nsColor: textColor)
+
+    /// Secondary text: labels, hints, everything said quietly.
+    static let muted = Color(nsColor: dynamic(light: 0x737373, dark: 0xA1A1A1))
+
+    /// The quietest tier — decorative marks and states nobody owes anything to.
+    static let faint = Color(nsColor: dynamic(light: 0xA3A3A3, dark: 0x525252))
+
+    // MARK: - Meaning
+
+    /// The accent is the text colour itself. The site marks what matters by
+    /// inverting it — a solid bar, a filled badge — rather than by hue.
+    static let accent = text
+
+    /// The one colour left. Red means an agent is stuck on a question and
+    /// nothing moves without a human; it appears nowhere else.
+    static let danger = Color(nsColor: dynamic(light: 0xC0342B, dark: 0xE5484D))
+
+    // MARK: - Terminal
+
+    /// SwiftTerm takes concrete colours, not dynamic ones — it converts them
+    /// the moment they are set. `PaneTerminalView` re-applies these when the
+    /// appearance changes; see its `viewDidChangeEffectiveAppearance`.
+    static var terminalBackground: NSColor { chromeColor }
+    static var terminalForeground: NSColor { textColor }
 }
 
 enum Typography {
-    /// Not a single bold face: in a monospaced font, weight makes a line
-    /// noticeably heavier, and colour is enough to tell elements apart.
-    static let item = Font.custom("Menlo", size: 11.5)
+    /// Geist Mono is the site's face, so it is the app's face too. It travels
+    /// inside the bundle: a machine without it installed would otherwise fall
+    /// back to whatever monospaced font it has, and the rebrand would last
+    /// exactly as far as this Mac.
+    ///
+    /// Registration is lazy on purpose — the first font asked for is the first
+    /// one drawn, and a `static let` runs once, before it.
+    @MainActor private static let registered: Bool = {
+        guard let url = Bundle.module.url(forResource: "GeistMono", withExtension: "ttf") else {
+            return false
+        }
+        return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    }()
+
+    @MainActor private static func geist(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        _ = registered
+        return .custom("Geist Mono", size: size).weight(weight)
+    }
+
+    /// Rows, titles, terminal-adjacent text.
+    @MainActor static var item: Font { geist(11.5) }
 
     /// Section headers and the status bar: smaller and sparser.
-    static let label = Font.custom("Menlo", size: 10)
+    @MainActor static var label: Font { geist(10) }
 
-    /// Computed rather than stored: `NSFont` is not `Sendable`, and a global
-    /// constant holding one is an error in Swift 6.
+    /// The active row, and only it. The site sets what it means to point at in
+    /// medium; anything heavier thickens a monospaced line more than it
+    /// emphasises it.
+    @MainActor static var itemEmphasis: Font { geist(11.5, .medium) }
+
+    /// The terminal keeps Menlo, and this is not an oversight.
+    ///
+    /// Geist Mono has box drawing and blocks, but no braille — and braille is
+    /// what Claude Code spins while an agent works (`⠋⠙⠹`), along with the `✳`
+    /// in its own title. Missing glyphs come from a fallback face of another
+    /// width, and a terminal grid pays for that in drifting columns.
     static var terminal: NSFont {
         NSFont(name: "Menlo", size: 13) ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
     }
@@ -100,8 +168,9 @@ struct Hairline: View {
 
 /// The agent's state as a single square.
 ///
-/// A square, not a circle: there is not one rounded corner in this interface,
-/// and a dot would break the row of hairlines and straight markers.
+/// A square, not a circle: there is not one rounded corner in this interface.
+/// With the palette down to one colour, the states are a ladder of weight —
+/// red, solid, grey, hollow — and only the top rung is coloured.
 struct AgentDot: View {
     let status: AgentStatus
     var size: CGFloat = 7
@@ -111,31 +180,42 @@ struct AgentDot: View {
 
     static func color(for status: AgentStatus) -> Color {
         switch status {
-        // Red draws attention — it marks the one case where nothing moves
-        // without a human.
+        // The one thing that cannot wait: without a human it does not move.
         case .waiting: Palette.danger
-        case .working: Palette.accent
-        case .done: Palette.ok
-        case .idle: Palette.muted
+        case .working: Palette.text
+        case .done: Palette.muted
+        case .idle: Palette.faint
         case .exited, .none: Palette.faint
         }
     }
 
+    /// Idle and finished sessions are drawn as an outline: nothing is owed in
+    /// either direction, and a filled square would claim otherwise.
+    static func isHollow(_ status: AgentStatus) -> Bool {
+        status == .idle || status == .exited || status == .none
+    }
+
     var body: some View {
-        Rectangle()
-            .fill(Self.color(for: status))
-            .frame(width: size, height: size)
-            // A working agent is the only element of the interface allowed to
-            // move.
-            .opacity(status == .working && dimmed ? 0.28 : 1)
-            .animation(
-                status == .working && !reduceMotion
-                    ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
-                    : .default,
-                value: dimmed
-            )
-            .onAppear { dimmed = status == .working && !reduceMotion }
-            .onChange(of: status) { dimmed = status == .working && !reduceMotion }
+        Group {
+            if Self.isHollow(status) {
+                Rectangle()
+                    .strokeBorder(Self.color(for: status), lineWidth: 1)
+            } else {
+                Rectangle()
+                    .fill(Self.color(for: status))
+            }
+        }
+        .frame(width: size, height: size)
+        // A working agent is the only element of the interface allowed to move.
+        .opacity(status == .working && dimmed ? 0.28 : 1)
+        .animation(
+            status == .working && !reduceMotion
+                ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+                : .default,
+            value: dimmed
+        )
+        .onAppear { dimmed = status == .working && !reduceMotion }
+        .onChange(of: status) { dimmed = status == .working && !reduceMotion }
     }
 }
 

@@ -209,7 +209,19 @@ extension TerminalSession: @preconcurrency LocalProcessTerminalViewDelegate {
 /// pane makes it active, and the click is caught by an event monitor in
 /// `AppDelegate`. Overriding `becomeFirstResponder` is not an option: in
 /// SwiftTerm it is `public`, not `open`.
-final class PaneTerminalView: LocalProcessTerminalView {}
+final class PaneTerminalView: LocalProcessTerminalView {
+    /// SwiftTerm resolves a colour once, when it is set, and keeps its own copy
+    /// — so a dynamic `NSColor` would freeze in whichever appearance was
+    /// current at launch. Switching the system to light left the pane black
+    /// inside a white window; this is what puts the two back together.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            configureTheme()
+        }
+    }
+}
 
 private extension LocalProcessTerminalView {
     /// The terminal is lighter than the chrome around it — the same trick as in

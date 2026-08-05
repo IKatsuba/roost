@@ -91,17 +91,19 @@ private struct OverviewCard: View {
             .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
-        .background(hovered ? Palette.chrome : Palette.terminal)
+        .background(hovered ? Palette.lineSoft : Palette.chrome)
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
         .onTapGesture { model.focusPane(item.pane.id) }
     }
 
+    /// The same ladder as the square: red only for the one that cannot move,
+    /// then weight — solid, grey, nothing.
     private var marker: Color {
         switch item.status {
         case .waiting: Palette.danger
         case .working: Palette.accent
-        case .done: Palette.ok
+        case .done: Palette.muted
         default: .clear
         }
     }

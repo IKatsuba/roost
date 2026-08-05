@@ -26,7 +26,12 @@ let package = Package(
             dependencies: [
                 "RoostCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
-            ]
+            ],
+            // Geist Mono travels with the app: the interface is set in it, and a
+            // machine that does not have it installed would otherwise fall back
+            // to whatever monospaced face it has. The licence rides along, as
+            // the OFL requires.
+            resources: [.process("Resources")]
         ),
     ]
 )

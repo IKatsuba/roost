@@ -150,6 +150,32 @@ The name is sanitised twice — on input and at the command itself
 (`Worktree.sanitize`). It travels into a shell string inside single quotes,
 while the snapshot is ordinary json a quote can be typed into by hand.
 
+### Looks
+
+The app wears [katsuba.dev](https://katsuba.dev)'s design: the same neutral
+scale, the same face, the same habit of separating things with a line instead of
+a fill. The palette tokens are that site's oklch values converted to sRGB —
+`#FFFFFF`/`#0A0A0A` for the ground, `#0A0A0A`/`#FAFAFA` for text, two greys
+between, and a hairline that is white at a tenth in the dark.
+
+**One colour survived the monochrome.** Red means an agent is stuck on a
+question and nothing moves without a human; it appears nowhere else. The other
+states are a ladder of weight — solid and pulsing for working, grey for done,
+hollow for idle. Adding a second hue would cost the first one its meaning.
+
+**Both themes, by system appearance.** The tokens are dynamic `NSColor`s, so
+AppKit and SwiftUI resolve them per view and nothing has to be reloaded. The
+terminal is the exception: SwiftTerm copies a colour the moment it is set, so
+`PaneTerminalView.viewDidChangeEffectiveAppearance` re-applies the theme —
+without it, switching macOS to light left a black pane inside a white window.
+
+**Geist Mono travels in the bundle** (`Sources/Roost/Resources`, OFL licence
+alongside) and is registered from `Bundle.module` on first use. The terminal
+keeps Menlo on purpose: Geist Mono has box drawing and blocks but no braille,
+and braille is what Claude Code spins while an agent works (`⠋⠙⠹`), along with
+the `✳` in its own title. Missing glyphs come from a fallback face of another
+width, and a terminal grid pays for that in drifting columns.
+
 ### Shortcuts
 
 They are declared as `NSMenu` items in `AppDelegate`, not through SwiftUI
@@ -182,7 +208,7 @@ over every keystroke.
   declared without `@MainActor`, so they are conformed to through
   `@preconcurrency`.
 - Styling goes only through `Palette` / `Typography` / `Metrics` from
-  `Theme.swift`. The interface has no rounded corners, shadows, bold faces or a
-  second accent colour; dividers are hairlines.
+  `Theme.swift`. The interface has no rounded corners and no shadows; dividers
+  are hairlines. See **Looks** below for what the palette is and why.
 - Tests are written with swift-testing (`@Suite`, `@Test`, `#expect`), the UI is
   checked by hand.
