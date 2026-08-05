@@ -14,6 +14,8 @@ a human come first.
 The terminal is [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm);
 everything else is written here.
 
+![Roost: projects in the sidebar, sessions as tabs, an agent at work in the pane and the attention queue on the right](docs/screenshot.png)
+
 ## What it does
 
 - **Projects and tabs.** A project is a directory; a tab is a session; a tab
