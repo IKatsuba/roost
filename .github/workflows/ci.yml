@@ -1,0 +1,42 @@
+name: ci
+
+# Pull requests are what this guards; main is checked too, so a bad merge is
+# visible without opening one.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push replaces the run in flight: the outdated one has nothing left to say.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # macOS because the package builds AppKit and SwiftTerm, and the default
+    # image has to carry Xcode 16 or newer — the toolchain Swift 6 needs. If the
+    # default ever drifts back, pin the image (macos-15) rather than adding a
+    # toolchain step.
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Printed on purpose: a build that fails only here is almost always a
+      # toolchain difference, and this is the first thing anybody asks about.
+      - name: Toolchain
+        run: swift --version
+
+      # `swift build` rather than xcodebuild: Xcode would compile SwiftTerm's
+      # Metal shader and demand a separate Metal Toolchain that SPM never asks
+      # for. Building the app too, not just the tested core — the app target is
+      # where a broken dependency shows up first.
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
