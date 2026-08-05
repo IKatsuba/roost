@@ -1,6 +1,7 @@
 # Roost
 
 [![ci](https://github.com/IKatsuba/roost/actions/workflows/ci.yml/badge.svg)](https://github.com/IKatsuba/roost/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/IKatsuba/roost)](https://github.com/IKatsuba/roost/releases/latest)
 
 A native macOS workspace for [Claude Code](https://claude.com/claude-code)
 sessions: projects, tabs, a tree of terminal panes, agent statuses and a command
@@ -38,11 +39,25 @@ one at work, a checker for finished, an outline for at rest.
 - **A command palette** (`⌘K`) over every pane, project, action and past
   session.
 
+## Install
+
+Every build lives on the
+[releases page](https://github.com/IKatsuba/roost/releases/latest): a universal
+`Roost-<version>.zip`. Unpack it, move `Roost.app` to `/Applications`, and tell
+Gatekeeper once that you meant it:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Roost.app
+```
+
+The signature is ad-hoc — there is no Developer ID and no notarisation — so
+without that line the app is refused as damaged.
+
 ## Requirements
 
 - macOS 14 or newer
 - [Claude Code](https://claude.com/claude-code) installed and on your `PATH`
-- Swift 6 toolchain (Xcode command line tools) to build
+- Swift 6 toolchain (Xcode command line tools) to build from source
 
 ## Build and run
 
@@ -56,18 +71,14 @@ inherits your `PATH` and hides the trap: under launchd the app gets a bare
 `/usr/bin:/bin`, where there is no `claude`. Notifications and the icon need a
 bundle too.
 
-To hand a build to another Mac:
+To hand a build to another Mac — this is what the releases are built with:
 
 ```sh
 tool/release.sh       # universal binary + build/Roost-<version>.zip
 ```
 
-The signature is ad-hoc — there is no Developer ID and no notarisation, so on
-the other machine Gatekeeper needs to be told once:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/Roost.app
-```
+The signature is ad-hoc there too, so on the other machine Gatekeeper needs the
+same line as in [Install](#install).
 
 ## Shortcuts
 
