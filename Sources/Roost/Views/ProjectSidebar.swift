@@ -108,11 +108,14 @@ private struct ProjectRow: View {
                             .font(Typography.item)
                             .lineLimit(1)
                             .truncationMode(.head)
-                            // A directory that is gone is marked by colour, not
-                            // by an icon: a row stays a row.
+                            // A directory that is gone is struck through rather
+                            // than coloured — there is no colour left to spend,
+                            // and a line through a name says "not there" in any
+                            // palette.
+                            .strikethrough(!project.exists, color: Palette.faint)
                             .foregroundStyle(
                                 !project.exists
-                                    ? Palette.danger
+                                    ? Palette.faint
                                     : (isActive || hovered ? Palette.text : Palette.muted)
                             )
 
@@ -144,7 +147,7 @@ private struct ProjectRow: View {
                 HStack(spacing: 3) {
                     ForEach(Array(statuses.enumerated()), id: \.offset) { _, status in
                         Rectangle()
-                            .fill(AgentDot.color(for: status))
+                            .fill(AgentMark.color(for: status))
                             .frame(width: 6, height: 3)
                     }
                 }

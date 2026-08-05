@@ -97,7 +97,7 @@ struct SessionBar: View {
             model.filter = status
         } label: {
             HStack(spacing: 7) {
-                if let status { AgentDot(status: status) }
+                if let status { AgentMark(status: status) }
                 Text(title)
                     .font(Typography.item)
                     .foregroundStyle(isActive ? Palette.text : Palette.muted)
@@ -137,7 +137,7 @@ private struct TabButton: View {
         HStack(spacing: 7) {
             let status = session?.status ?? .none
             if status != .none {
-                AgentDot(status: status)
+                AgentMark(status: status)
             }
 
             Text(session?.name ?? tab.title)

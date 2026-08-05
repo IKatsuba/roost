@@ -325,7 +325,7 @@ struct CommandPalette: View {
 
             Group {
                 if command.status != .none {
-                    AgentDot(status: command.status)
+                    AgentMark(status: command.status)
                 }
             }
             .frame(width: 10, alignment: .leading)

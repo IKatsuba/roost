@@ -62,7 +62,7 @@ struct SidePanel: View {
             side = value
         } label: {
             HStack(spacing: 6) {
-                if value == .queue { AgentDot(status: .waiting) }
+                if value == .queue { AgentMark(status: .waiting) }
 
                 Text(title)
                     .font(Typography.label)
@@ -72,7 +72,7 @@ struct SidePanel: View {
                 Text("\(count)")
                     .font(Typography.label)
                     .monospacedDigit()
-                    .foregroundStyle(isAlarm ? Palette.danger : Palette.faint)
+                    .foregroundStyle(isAlarm ? Palette.text : Palette.faint)
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)
@@ -169,7 +169,7 @@ private struct FeedRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            AgentDot(status: entry.status)
+            AgentMark(status: entry.status)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(entry.project) / \(entry.title)")
@@ -214,10 +214,12 @@ private struct FeedRow: View {
         }
     }
 
+    /// The same order as the marks: what is owed reads at full strength, what
+    /// is finished a step below, the rest quietly.
     private var colour: Color {
         switch entry.status {
-        case .waiting: Palette.danger
-        case .done: Palette.text
+        case .waiting: Palette.text
+        case .done: Palette.muted
         default: Palette.muted
         }
     }
@@ -232,14 +234,14 @@ private struct QueueCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 7) {
-                AgentDot(status: .waiting)
+                AgentMark(status: .waiting)
                 Text("\(item.project.name) / \(item.title)")
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 6)
                 Text(formatAge(item.age))
                     .monospacedDigit()
-                    .foregroundStyle(Palette.danger)
+                    .foregroundStyle(Palette.text)
             }
             .font(Typography.label)
             .foregroundStyle(Palette.muted)

@@ -21,8 +21,9 @@ everything else is written here.
 - **Projects and tabs.** A project is a directory; a tab is a session; a tab
   splits into a tree of panes, each holding `claude` or a plain shell.
 - **Agent status without asking.** Claude Code's hooks report back: working,
-  done, or waiting for you. Red means exactly one thing — nothing moves without
-  a human.
+  done, or waiting for you. The interface has no colour at all — each state
+  fills its square differently, and only the one that cannot move without you
+  fills it completely.
 - **An attention queue.** Every waiting agent in one list, longest wait first,
   with the question it is stuck on. Plus a feed of what happened today.
 - **Sessions you can come back to.** Layout survives a restart, and a claude

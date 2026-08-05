@@ -76,7 +76,10 @@ struct ViewSwitch: View {
                     Text(badge > 0 ? "\(badge)" : " ")
                         .font(Typography.label)
                         .monospacedDigit()
-                        .foregroundStyle(Palette.danger)
+                        // Full text weight, where everything around it is muted:
+                        // that is what a count of waiting agents gets instead of
+                        // a colour.
+                        .foregroundStyle(Palette.text)
                         .frame(width: 8, alignment: .leading)
                 }
             }

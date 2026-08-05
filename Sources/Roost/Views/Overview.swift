@@ -47,7 +47,7 @@ private struct OverviewCard: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
-                    AgentDot(status: item.status)
+                    AgentMark(status: item.status)
                     Text(item.project.name)
                         .lineLimit(1)
                     Spacer(minLength: 6)
@@ -101,9 +101,9 @@ private struct OverviewCard: View {
     /// then weight — solid, grey, nothing.
     private var marker: Color {
         switch item.status {
-        case .waiting: Palette.danger
-        case .working: Palette.accent
-        case .done: Palette.muted
+        case .waiting: Palette.text
+        case .working: Palette.muted
+        case .done: Palette.faint
         default: .clear
         }
     }

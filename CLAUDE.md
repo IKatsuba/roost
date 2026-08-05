@@ -158,10 +158,17 @@ a fill. The palette tokens are that site's oklch values converted to sRGB —
 `#FFFFFF`/`#0A0A0A` for the ground, `#0A0A0A`/`#FAFAFA` for text, two greys
 between, and a hairline that is white at a tenth in the dark.
 
-**One colour survived the monochrome.** Red means an agent is stuck on a
-question and nothing moves without a human; it appears nowhere else. The other
-states are a ladder of weight — solid and pulsing for working, grey for done,
-hollow for idle. Adding a second hue would cost the first one its meaning.
+**No colour at all — states are told apart by texture.** `AgentMark` draws the
+square with a different fill per state: solid for waiting, bars for working (the
+one thing allowed to move), a 4×4 checker for done, an outline for idle and
+exited. Lightness carries the same order, so the ladder still reads where a mark
+is too small for a pattern — the strips under a project's name, for one.
+
+Texture beats hue for the same reason it does on a printed chart: it survives
+greyscale, colour blindness, and a screenshot pasted into a chat. Where a mark
+does not fit at all, the rank shows as weight instead: a count of waiting agents
+is set in full text colour while everything around it is muted, and a project
+whose directory has vanished is struck through rather than painted.
 
 **Both themes, by system appearance.** The tokens are dynamic `NSColor`s, so
 AppKit and SwiftUI resolve them per view and nothing has to be reloaded. The

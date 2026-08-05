@@ -76,7 +76,7 @@ private struct PaneLeafView: View {
         let session = model.session(pane.id)
 
         return HStack(spacing: 7) {
-            AgentDot(status: session?.status ?? .none)
+            AgentMark(status: session?.status ?? .none)
 
             Text(session?.name ?? pane.title)
                 .lineLimit(1)

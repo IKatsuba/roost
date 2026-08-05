@@ -71,11 +71,10 @@ enum Palette {
 
     /// The accent is the text colour itself. The site marks what matters by
     /// inverting it — a solid bar, a filled badge — rather than by hue.
+    ///
+    /// There is no second colour, and no red: states are told apart by the
+    /// texture of their mark, see [AgentMark].
     static let accent = text
-
-    /// The one colour left. Red means an agent is stuck on a question and
-    /// nothing moves without a human; it appears nowhere else.
-    static let danger = Color(nsColor: dynamic(light: 0xC0342B, dark: 0xE5484D))
 
     // MARK: - Terminal
 
@@ -169,40 +168,101 @@ struct Hairline: View {
 /// The agent's state as a single square.
 ///
 /// A square, not a circle: there is not one rounded corner in this interface.
-/// With the palette down to one colour, the states are a ladder of weight —
-/// red, solid, grey, hollow — and only the top rung is coloured.
-struct AgentDot: View {
+/// And with no colour left to spend, the states are told apart by **texture** —
+/// how densely the square is filled:
+///
+///     ■  waiting   solid — the only mark that fills completely
+///     ≡  working   bars, and the one thing allowed to move
+///     ▨  done      a checker, half as present as solid
+///     □  idle      an outline: nothing owed in either direction
+///     ▫  exited    the same outline, gone quiet
+///
+/// Texture beats hue here for the same reason it does on a printed chart: it
+/// survives greyscale, colour blindness, and a screenshot pasted into a chat.
+/// The ladder is monotonic on purpose — the more ink, the more it wants from
+/// you.
+struct AgentMark: View {
     let status: AgentStatus
-    var size: CGFloat = 7
+    var size: CGFloat = 8
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dimmed = false
 
+    enum Texture {
+        case solid
+        case bars
+        case checker
+        case outline
+    }
+
+    static func texture(for status: AgentStatus) -> Texture {
+        switch status {
+        // Solid, and solid alone: without a human this one does not move.
+        case .waiting: .solid
+        case .working: .bars
+        case .done: .checker
+        case .idle, .exited, .none: .outline
+        }
+    }
+
+    /// Lightness carries the same order as the texture, so the ladder still
+    /// reads where a mark is too small for a pattern — the strips under a
+    /// project's name, for one.
     static func color(for status: AgentStatus) -> Color {
         switch status {
-        // The one thing that cannot wait: without a human it does not move.
-        case .waiting: Palette.danger
-        case .working: Palette.text
+        case .waiting, .working: Palette.text
         case .done: Palette.muted
-        case .idle: Palette.faint
+        case .idle: Palette.muted
         case .exited, .none: Palette.faint
         }
     }
 
-    /// Idle and finished sessions are drawn as an outline: nothing is owed in
-    /// either direction, and a filled square would claim otherwise.
-    static func isHollow(_ status: AgentStatus) -> Bool {
-        status == .idle || status == .exited || status == .none
-    }
-
     var body: some View {
-        Group {
-            if Self.isHollow(status) {
-                Rectangle()
-                    .strokeBorder(Self.color(for: status), lineWidth: 1)
-            } else {
-                Rectangle()
-                    .fill(Self.color(for: status))
+        Canvas { context, size in
+            let color = Self.color(for: status)
+            let box = CGRect(origin: .zero, size: size)
+
+            switch Self.texture(for: status) {
+            case .solid:
+                context.fill(Path(box), with: .color(color))
+
+            case .bars:
+                // Three bars with gaps of their own width: at 8pt that is two
+                // pixels of ink and two of ground on a retina screen, which is
+                // the finest stripe that does not turn into grey mush.
+                var bars = Path()
+                for y in stride(from: 0.0, to: size.height, by: 3) {
+                    bars.addRect(CGRect(x: 0, y: y, width: size.width, height: 1.5))
+                }
+                context.fill(bars, with: .color(color))
+
+            case .checker:
+                // A 4×4 checker — the classic 50% dither, and the only way to
+                // read "half filled" at this size.
+                let unit = size.width / 4
+                var cells = Path()
+                for row in 0..<4 {
+                    for column in 0..<4 where (row + column).isMultiple(of: 2) {
+                        cells.addRect(
+                            CGRect(
+                                x: CGFloat(column) * unit,
+                                y: CGFloat(row) * unit,
+                                width: unit,
+                                height: unit
+                            )
+                        )
+                    }
+                }
+                context.fill(cells, with: .color(color))
+
+            case .outline:
+                // Inset by half a line, or the stroke would straddle the edge
+                // and come out two pixels wide and grey.
+                context.stroke(
+                    Path(box.insetBy(dx: 0.5, dy: 0.5)),
+                    with: .color(color),
+                    lineWidth: 1
+                )
             }
         }
         .frame(width: size, height: size)

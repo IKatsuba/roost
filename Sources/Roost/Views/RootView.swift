@@ -119,7 +119,7 @@ private struct StatusBar: View {
             ForEach([AgentStatus.waiting, .working, .done, .idle], id: \.self) { status in
                 if let count = counts[status], count > 0 {
                     HStack(spacing: 5) {
-                        AgentDot(status: status)
+                        AgentMark(status: status)
                         Text("\(count) \(Self.word(for: status))")
                             .font(Typography.label)
                             .monospacedDigit()
