@@ -41,4 +41,13 @@ done
 # signature macOS gives the app no stable identity.
 codesign --force --sign - "$APP" >/dev/null
 
+# Tell LaunchServices about the bundle that has just appeared. Every build wipes
+# the directory and writes it anew, so the old record keeps pointing at an inode
+# that no longer exists — and the record is how the system finds the icon by
+# bundle id. The notification daemon resolves it exactly that way and, on a dead
+# record, draws its generic placeholder instead of the app's icon. The Dock does
+# not give the trap away: it holds the icon of the running process.
+"/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister" \
+  -f "$APP" 2>/dev/null || true
+
 echo "$ROOT/$APP"
