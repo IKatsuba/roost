@@ -13,14 +13,20 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-/// The colours are a copy of `Palette`. The duplication is deliberate: the
-/// script is not built together with the app, so there is nothing to import.
-let backdropTop = CGColor(srgbRed: 0x1E / 255, green: 0x1E / 255, blue: 0x22 / 255, alpha: 1)
-let backdropBottom = CGColor(srgbRed: 0x11 / 255, green: 0x11 / 255, blue: 0x14 / 255, alpha: 1)
-let accent = CGColor(srgbRed: 0x7F / 255, green: 0xA6 / 255, blue: 0xC4 / 255, alpha: 1)
-let danger = CGColor(srgbRed: 0xC9 / 255, green: 0x7A / 255, blue: 0x6E / 255, alpha: 1)
+/// The colours are a copy of `Palette`'s dark theme. The duplication is
+/// deliberate: the script is not built together with the app, so there is
+/// nothing to import.
+let backdropTop = CGColor(srgbRed: 0x17 / 255, green: 0x17 / 255, blue: 0x17 / 255, alpha: 1)
+let backdropBottom = CGColor(srgbRed: 0x0A / 255, green: 0x0A / 255, blue: 0x0A / 255, alpha: 1)
+let mark = CGColor(srgbRed: 0xFA / 255, green: 0xFA / 255, blue: 0xFA / 255, alpha: 1)
 
-/// Two cursors: an agent at work, and one that ran into a question.
+/// Two cursors, in the interface's own alphabet: one striped, one solid — an
+/// agent at work beside one that ran into a question.
+///
+/// The icon has no colour, because the app has none: states are told apart by
+/// how densely their mark is filled, and the two bars here are the top two rungs
+/// of that ladder. The stripes blur into a lighter grey at 16 px, which is the
+/// same thing said quieter — the ladder survives the loss of detail.
 ///
 /// Drawn across the whole canvas, with no shape and no margins of its own.
 /// macOS 26 takes rounding and framing upon itself: a squircle of ours would be
@@ -47,14 +53,27 @@ func draw(_ ctx: CGContext, size: CGFloat) {
     )
 
     let width = 176 * u, height = 400 * u, gap = 96 * u
-    for (offset, color) in [(-gap / 2 - width, accent), (gap / 2, danger)] {
-        ctx.setFillColor(color)
+    let bottom = frame.midY - height / 2
+    ctx.setFillColor(mark)
+
+    // The left bar is striped — the mark of an agent that is working, and the
+    // one thing in this interface allowed to move.
+    let band = 28 * u
+    var y = bottom
+    while y < bottom + height {
         ctx.fill(
             CGRect(
-                x: frame.midX + offset, y: frame.midY - height / 2, width: width, height: height
+                x: frame.midX - gap / 2 - width,
+                y: y,
+                width: width,
+                height: min(band, bottom + height - y)
             )
         )
+        y += band * 2
     }
+
+    // The right bar is solid: waiting, the only state filled completely.
+    ctx.fill(CGRect(x: frame.midX + gap / 2, y: bottom, width: width, height: height))
 }
 
 func render(size: Int) -> Data {
