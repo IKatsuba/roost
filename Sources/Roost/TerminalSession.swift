@@ -210,6 +210,22 @@ extension TerminalSession: @preconcurrency LocalProcessTerminalViewDelegate {
 /// `AppDelegate`. Overriding `becomeFirstResponder` is not an option: in
 /// SwiftTerm it is `public`, not `open`.
 final class PaneTerminalView: LocalProcessTerminalView {
+    /// SwiftTerm pins an `NSScroller` to its trailing edge and never hides it —
+    /// it only enables and disables it. In a pane with nothing to scroll the
+    /// knob covers the whole track, and a constantly redrawing agent keeps the
+    /// overlay from ever fading, so a fresh session wears a bright bar down its
+    /// right side while an old one does not.
+    ///
+    /// Hiding it is not only cosmetic: `reservedScrollerWidth` is zero for a
+    /// hidden scroller, so the columns get those 15 points back. Hidden before
+    /// `super`, because that is who measures them.
+    override func layout() {
+        for case let scroller as NSScroller in subviews where !scroller.isHidden {
+            scroller.isHidden = true
+        }
+        super.layout()
+    }
+
     /// SwiftTerm resolves a colour once, when it is set, and keeps its own copy
     /// — so a dynamic `NSColor` would freeze in whichever appearance was
     /// current at launch. Switching the system to light left the pane black
