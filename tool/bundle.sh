@@ -37,9 +37,14 @@ for BUNDLE in "$BIN_PATH"/*.bundle; do
   cp -R "$BUNDLE" "$APP/Contents/Resources/"
 done
 
-# An ad-hoc signature: a prototype has no Developer ID of its own, and without a
-# signature macOS gives the app no stable identity.
-codesign --force --sign - "$APP" >/dev/null
+# An ad-hoc signature: a local build needs no Developer ID, and without a
+# signature at all macOS gives the app no stable identity. The release is signed
+# for real, by tool/release.sh.
+#
+# --options runtime even here, where nothing demands it: the hardened runtime is
+# what notarisation requires, and anything it forbids should show up in the
+# build you run every day rather than in the one already sent to Apple.
+codesign --force --options runtime --sign - "$APP" >/dev/null
 
 # Tell LaunchServices about the bundle that has just appeared. Every build wipes
 # the directory and writes it anew, so the old record keeps pointing at an inode

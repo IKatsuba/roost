@@ -41,17 +41,18 @@ one at work, a checker for finished, an outline for at rest.
 
 ## Install
 
-Every build lives on the
-[releases page](https://github.com/IKatsuba/roost/releases/latest): a universal
-`Roost-<version>.zip`. Unpack it, move `Roost.app` to `/Applications`, and tell
-Gatekeeper once that you meant it:
-
 ```sh
-xattr -dr com.apple.quarantine /Applications/Roost.app
+brew install --cask ikatsuba/tap/roost
 ```
 
-The signature is ad-hoc — there is no Developer ID and no notarisation — so
-without that line the app is refused as damaged.
+Or by hand: every build lives on the
+[releases page](https://github.com/IKatsuba/roost/releases/latest) as a
+universal `Roost-<version>.zip` — unpack it and move `Roost.app` to
+`/Applications`.
+
+Either way it just opens: the builds are signed with a Developer ID and
+notarised, and the ticket is stapled into the bundle, so Gatekeeper is satisfied
+without asking Apple and without being told anything by hand.
 
 ## Requirements
 
@@ -74,11 +75,14 @@ bundle too.
 To hand a build to another Mac — this is what the releases are built with:
 
 ```sh
-tool/release.sh       # universal binary + build/Roost-<version>.zip
+tool/release.sh       # universal binary, Developer ID, notarised -> build/Roost-<version>.zip
 ```
 
-The signature is ad-hoc there too, so on the other machine Gatekeeper needs the
-same line as in [Install](#install).
+That one needs a Developer ID Application certificate in the keychain and a
+`notarytool` profile named `roost-notary`; `ROOST_SKIP_NOTARIZE=1` stops at the
+signature, since a submission to Apple takes minutes. The local `bundle.sh`
+needs neither — its signature is ad-hoc, which is enough for a build that never
+leaves the machine.
 
 ## Shortcuts
 
