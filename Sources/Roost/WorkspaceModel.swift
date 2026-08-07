@@ -382,6 +382,25 @@ final class WorkspaceModel {
         scheduleSave()
     }
 
+    /// Reorders a tab: takes it out and puts it back at `index`.
+    ///
+    /// Called once, when a drag is released — while the mouse is down the strip
+    /// only pretends with offsets. Reordering the model mid-gesture tears the
+    /// views out from under the gesture itself.
+    func moveTab(_ tabID: String, to index: Int) {
+        // The same search as closeTab's: locate() speaks panes, not tabs.
+        guard let projectID = projects.map(\.id).first(where: { id in
+            tabs(of: id).contains { $0.id == tabID }
+        }), var list = tabs[projectID],
+            let from = list.firstIndex(where: { $0.id == tabID })
+        else { return }
+
+        let tab = list.remove(at: from)
+        list.insert(tab, at: min(max(index, 0), list.count))
+        tabs[projectID] = list
+        scheduleSave()
+    }
+
     func selectTab(_ tabID: String) {
         guard let projectID = activeProjectID, activeTabIDs[projectID] != tabID else { return }
         activeTabIDs[projectID] = tabID
