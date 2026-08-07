@@ -42,8 +42,13 @@ one at work, a checker for finished, an outline for at rest.
 ## Install
 
 ```sh
-brew install --cask ikatsuba/tap/roost
+brew tap ikatsuba/tap
+brew trust ikatsuba/tap
+brew install --cask roost
 ```
+
+The middle line is not optional: Homebrew 6 refuses to load anything from a tap
+outside its own repositories until you say you meant that one.
 
 Or by hand: every build lives on the
 [releases page](https://github.com/IKatsuba/roost/releases/latest) as a
