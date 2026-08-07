@@ -19,7 +19,9 @@ final class Notifier: NSObject {
     /// works exactly as it did, only silently.
     func prepare() {
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
+        // `.badge` is not cosmetic: since macOS 11 the dock tile ignores
+        // `badgeLabel` unless the badge authorization was asked for.
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) {
             granted, _ in
             Task { @MainActor [weak self] in self?.allowed = granted }
         }
