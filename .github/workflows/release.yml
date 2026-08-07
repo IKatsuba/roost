@@ -28,16 +28,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # A dry run is allowed off a branch: it answers a question about the
+      # keychain, not about the version, and the workflow file it needs would
+      # not be on the tag yet anyway — workflow_dispatch reads it from the ref
+      # it is given.
       - name: Version
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' tool/Info.plist)"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "Tag $GITHUB_REF_NAME says $TAG, tool/Info.plist says $VERSION." >&2
+              exit 1
+            fi
+          elif [ "$DRY_RUN" != "true" ]; then
             echo "This workflow releases a tag; run it on one." >&2
-            exit 1
-          fi
-          VERSION="${GITHUB_REF_NAME#v}"
-          PLIST="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' tool/Info.plist)"
-          if [ "$VERSION" != "$PLIST" ]; then
-            echo "Tag $GITHUB_REF_NAME says $VERSION, tool/Info.plist says $PLIST." >&2
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
