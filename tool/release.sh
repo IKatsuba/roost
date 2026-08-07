@@ -13,6 +13,9 @@
 #   ROOST_SIGN_IDENTITY=…      which certificate to sign with (default: the only
 #                              Developer ID Application in the keychain)
 #   ROOST_NOTARY_PROFILE=…     notarytool keychain profile (default: roost-notary)
+#   ROOST_NOTARY_KEY=…         path to the App Store Connect .p8; with it, the
+#   ROOST_NOTARY_KEY_ID=…      three replace the profile — CI has the credentials
+#   ROOST_NOTARY_ISSUER=…      as secrets and no keychain worth storing them in
 #   ROOST_SKIP_NOTARIZE=1      sign but do not notarise — for trying the build
 #                              out, since a submission takes minutes
 #
@@ -26,7 +29,15 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-NOTARY_PROFILE="${ROOST_NOTARY_PROFILE:-roost-notary}"
+# A stored profile is the convenient half of the deal: it lives in the keychain,
+# so a release from this machine needs nothing on the command line. A runner has
+# no such keychain — it gets the same credentials as secrets and passes them
+# through, which is what the three ROOST_NOTARY_KEY* variables are for.
+if [ -n "${ROOST_NOTARY_KEY:-}" ]; then
+  NOTARY_AUTH="--key $ROOST_NOTARY_KEY --key-id $ROOST_NOTARY_KEY_ID --issuer $ROOST_NOTARY_ISSUER"
+else
+  NOTARY_AUTH="--keychain-profile ${ROOST_NOTARY_PROFILE:-roost-notary}"
+fi
 
 # The identity is looked up rather than written down: the certificate expires
 # every few years and its hash changes with it, while there is only ever one
@@ -87,8 +98,11 @@ if [ "${ROOST_SKIP_NOTARIZE:-0}" != "1" ]; then
   rm -f build/notarize.zip
   ditto -c -k --keepParent "$APP" build/notarize.zip
 
-  xcrun notarytool submit build/notarize.zip \
-    --keychain-profile "$NOTARY_PROFILE" --wait
+  # --timeout, because the wait is otherwise unbounded: a submission that hangs
+  # on Apple's side would hold a runner until the job's own limit killed it,
+  # with nothing in the log to say why.
+  # shellcheck disable=SC2086
+  xcrun notarytool submit build/notarize.zip $NOTARY_AUTH --wait --timeout 45m
   rm -f build/notarize.zip
 
   # Stapling is what makes the app launch on a machine that is offline or behind

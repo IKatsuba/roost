@@ -1,0 +1,106 @@
+name: release
+
+# The tag is both the trigger and the version. Nothing is built until it agrees
+# with tool/Info.plist: a tag that disagrees would produce a Roost-1.2.3.zip
+# holding a bundle that calls itself something else, and the cask points at the
+# file name.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "sign only — no notarisation, no draft"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    # Signing is minutes, notarisation is Apple's queue — the first submission
+    # from a new account took half an hour. The limit is there for a hang, not
+    # for a slow day.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "This workflow releases a tag; run it on one." >&2
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          PLIST="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' tool/Info.plist)"
+          if [ "$VERSION" != "$PLIST" ]; then
+            echo "Tag $GITHUB_REF_NAME says $VERSION, tool/Info.plist says $PLIST." >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      # The certificate lives in a keychain of its own, thrown away with the
+      # runner. It is added to the search list rather than made default:
+      # codesign looks through the list, and displacing the default would take
+      # the runner's own keychain out from under everything else.
+      - name: Certificate
+        env:
+          CERTIFICATE: ${{ secrets.CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/roost.keychain-db"
+          PASSWORD="$(uuidgen)"
+
+          security create-keychain -p "$PASSWORD" "$KEYCHAIN"
+          # Without this the keychain re-locks on its own timer mid-build and
+          # codesign fails somewhere in the middle with nothing useful to say.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          rm "$RUNNER_TEMP/certificate.p12"
+
+          # An imported key asks for confirmation the first time something signs
+          # with it — a dialog nobody is there to answer. This grants the access
+          # up front, and is the step whose absence looks like codesign hanging.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$PASSWORD" "$KEYCHAIN" > /dev/null
+
+      # A dry run stops after the signature. It is there because the fragile
+      # half of this job is the keychain, not Apple: whether the certificate
+      # imported and codesign could reach the key is answered in two minutes,
+      # while a notarised run costs the better part of an hour to say the same.
+      - name: Build, sign, notarise
+        env:
+          ROOST_SKIP_NOTARIZE: ${{ inputs.dry_run && '1' || '0' }}
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          ROOST_NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ROOST_NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          export ROOST_NOTARY_KEY="$RUNNER_TEMP/notary.p8"
+          tool/release.sh
+          rm "$ROOST_NOTARY_KEY"
+
+      # A draft, not a release: the notes are written by a human, and the build
+      # should be waiting by the time they are. Publishing is a click.
+      - name: Draft
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="build/Roost-$VERSION.zip"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ZIP" \
+              --draft --title "Roost $VERSION" --generate-notes
+          fi
+          echo "### Roost $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          shasum -a 256 "$ZIP" >> "$GITHUB_STEP_SUMMARY"
