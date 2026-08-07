@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # A dry run is allowed off a branch: it answers a question about the
       # keychain, not about the version, and the workflow file it needs would

@@ -24,7 +24,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Printed on purpose: a build that fails only here is almost always a
       # toolchain difference, and this is the first thing anybody asks about.
