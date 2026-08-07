@@ -76,6 +76,34 @@ struct WorkspaceSnapshotTests {
         #expect(restored.activeProjectID == project.id)
     }
 
+    @Test("hidden side columns survive a round-trip")
+    func hiddenColumnsRoundTrip() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("roost-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = WorkspaceStore(directory: directory)
+        try store.save(WorkspaceSnapshot(sidebarHidden: true, sidePanelHidden: true))
+
+        let restored = store.load()
+
+        #expect(restored.sidebarHidden)
+        #expect(restored.sidePanelHidden)
+    }
+
+    @Test("a snapshot from before the hidden-columns flags still decodes")
+    func decodesSnapshotWithoutVisibilityKeys() throws {
+        // Missing keys must fall back, not throw: `load()` answers any throw
+        // with a clean state, which would wipe the workspace over a boolean.
+        let old = """
+            {"version":1,"projects":[],"tabs":{},"activeTabIDs":{}}
+            """
+        let restored = try JSONDecoder().decode(WorkspaceSnapshot.self, from: Data(old.utf8))
+
+        #expect(!restored.sidebarHidden)
+        #expect(!restored.sidePanelHidden)
+    }
+
     @Test("a missing snapshot gives an empty state rather than a crash")
     func missingSnapshot() {
         let store = WorkspaceStore(

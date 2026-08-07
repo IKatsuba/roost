@@ -26,8 +26,8 @@ struct SessionBar: View {
         HStack(spacing: 0) {
             switch model.mode {
             case .work:
-                label(model.activeProject?.name ?? "SESSIONS")
-                Hairline(vertical: true)
+                // The project's name is not here: in "work" the bar is one of
+                // three columns, and the name heads the sidebar's own column.
                 tabs
             case .deck:
                 label("SHOW")
