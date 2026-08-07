@@ -16,7 +16,7 @@ swift build                      # build
 swift test                       # all tests (swift-testing, not XCTest)
 swift test --filter resumesKnownSession   # a single test by function name
 tool/bundle.sh                   # build/Roost.app, ad-hoc signature
-tool/release.sh                  # universal bundle + build/Roost-<version>.zip
+tool/release.sh                  # universal, Developer ID, notarised -> .zip
 swift tool/icon.swift tool/Roost.icns     # redraw the icon
 ```
 
@@ -204,6 +204,39 @@ The `⌘K` palette lives in a separate `NSPanel` (`PaletteWindow`) rather than a
 a layer inside the main window: inside the window the first responder is the
 terminal, and taking that away for a text field would mean fighting SwiftTerm
 over every keystroke.
+
+### Releases
+
+A release is cut by a tag: `v0.2.2` pushed to the repository runs
+`.github/workflows/release.yml`, which refuses to build unless the tag agrees
+with `CFBundleShortVersionString`, signs, notarises, and leaves the `.zip` on a
+**draft** release for the notes to be written by hand.
+
+The signature is the point of the whole path. An ad-hoc bundle is refused as
+damaged on any machine but the one that built it, and Homebrew Cask puts the
+quarantine attribute *on* what it installs, so `brew` and ad-hoc do not meet at
+all. Hence `--options runtime` (notarisation rejects a submission without the
+hardened runtime, which is why `bundle.sh` turns it on too — let it break in the
+build run every day) and `--timestamp` (a signature without one stops verifying
+the day the certificate expires, taking every copy already downloaded with it).
+
+Apple returns the ticket separately from the submission, so the archive sent for
+notarisation is a throwaway: the one people download is packed after `stapler`,
+or every first launch would go asking Apple for a ticket the bundle does not
+carry.
+
+Locally the credentials live in the keychain — a certificate and a `notarytool`
+profile named `roost-notary`. A runner has neither, so `release.sh` also takes
+`ROOST_NOTARY_KEY` / `_KEY_ID` / `_ISSUER`. The one non-obvious step in the
+workflow is `security set-key-partition-list`: without it a freshly imported key
+asks for confirmation in a dialog nobody is there to answer, and `codesign`
+looks hung rather than failed.
+
+The cask lives in [IKatsuba/homebrew-tap](https://github.com/IKatsuba/homebrew-tap)
+and is bumped by `cask.yml` — on publish rather than on the tag, since a draft's
+asset is not downloadable and a cask pointing at one answers 404 to everybody
+but its author. The tap is another repository, so that workflow needs a token of
+its own: `github.token` does not reach past the repository it belongs to.
 
 ## Conventions
 

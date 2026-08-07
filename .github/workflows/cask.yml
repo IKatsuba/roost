@@ -1,0 +1,58 @@
+name: cask
+
+# On publish, not on the tag: release.yml leaves a draft, and a draft's asset is
+# not downloadable — a cask bumped before the notes are written would point at a
+# URL that answers 404 to everyone but the author.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # The tap is another repository, and github.token does not reach past this
+    # one. Without a token of its own there is nothing to do here — a release
+    # that did not bump the cask is incomplete, not broken, so this is skipped
+    # rather than failed.
+    if: ${{ github.event.release.assets[0] != null }}
+
+    steps:
+      - name: Bump
+        env:
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No TAP_TOKEN; the cask has to be bumped by hand." >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          # The checksum is taken from what the world will download, not from
+          # what the build produced: if the two ever disagree, brew is the one
+          # who finds out, and this is the cheaper place to notice.
+          curl -fsSL -o roost.zip \
+            "https://github.com/$REPO/releases/download/$TAG/Roost-$VERSION.zip"
+          SHA="$(sha256sum roost.zip | cut -d' ' -f1)"
+
+          git clone --depth 1 \
+            "https://x-access-token:$GH_TOKEN@github.com/IKatsuba/homebrew-tap.git" tap
+          cd tap
+          sed -i -E "s|^  version \".*\"|  version \"$VERSION\"|" Casks/roost.rb
+          sed -i -E "s|^  sha256 \".*\"|  sha256 \"$SHA\"|" Casks/roost.rb
+
+          # Nothing to say if the cask already points there — a re-published
+          # release should not produce an empty commit.
+          if git diff --quiet; then
+            echo "The cask is already at $VERSION."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -aqm "chore: roost $VERSION"
+          git push -q
