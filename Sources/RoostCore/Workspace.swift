@@ -73,18 +73,51 @@ public struct WorkspaceSnapshot: Codable, Hashable, Sendable {
     /// projectID -> id of the active tab inside the project.
     public var activeTabIDs: [String: String]
 
+    /// The side columns can be put away; that choice survives a restart the
+    /// same way the layout does.
+    public var sidebarHidden: Bool
+    public var sidePanelHidden: Bool
+
     public init(
         version: Int = WorkspaceSnapshot.currentVersion,
         projects: [Project] = [],
         tabs: [String: [TabSpec]] = [:],
         activeProjectID: String? = nil,
-        activeTabIDs: [String: String] = [:]
+        activeTabIDs: [String: String] = [:],
+        sidebarHidden: Bool = false,
+        sidePanelHidden: Bool = false
     ) {
         self.version = version
         self.projects = projects
         self.tabs = tabs
         self.activeProjectID = activeProjectID
         self.activeTabIDs = activeTabIDs
+        self.sidebarHidden = sidebarHidden
+        self.sidePanelHidden = sidePanelHidden
+    }
+
+    // Hand-written for the fields added after 0.1: a snapshot from an older
+    // build has no key for them, and synthesised decoding would throw — and
+    // `load()` answers any throw with a clean state, wiping the workspace over
+    // a missing boolean.
+    private enum CodingKeys: String, CodingKey {
+        case version, projects, tabs, activeProjectID, activeTabIDs
+        case sidebarHidden, sidePanelHidden
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            version: try container.decode(Int.self, forKey: .version),
+            projects: try container.decode([Project].self, forKey: .projects),
+            tabs: try container.decode([String: [TabSpec]].self, forKey: .tabs),
+            activeProjectID: try container.decodeIfPresent(String.self, forKey: .activeProjectID),
+            activeTabIDs: try container.decode([String: String].self, forKey: .activeTabIDs),
+            sidebarHidden: try container.decodeIfPresent(Bool.self, forKey: .sidebarHidden)
+                ?? false,
+            sidePanelHidden: try container.decodeIfPresent(Bool.self, forKey: .sidePanelHidden)
+                ?? false
+        )
     }
 }
 

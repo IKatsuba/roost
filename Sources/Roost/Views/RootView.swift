@@ -11,19 +11,40 @@ struct RootView: View {
         // own, or the keyboard would stay with the terminal.
         VStack(spacing: 0) {
             Hairline()
-            SessionBar(model: model)
-            Hairline()
 
             switch model.mode {
             case .work:
+                // Three columns rather than a bar over three columns: the side
+                // columns own their top row, so each reaches the title bar and
+                // can be put away whole. Their headers share the session bar's
+                // height, and the hairlines under them meet in one line.
                 HStack(spacing: 0) {
-                    ProjectSidebar(model: model)
-                    Hairline(vertical: true)
-                    mainArea
-                    Hairline(vertical: true)
-                    SidePanel(model: model)
+                    if !model.sidebarHidden {
+                        VStack(spacing: 0) {
+                            SidebarHeader(model: model)
+                            Hairline()
+                            ProjectSidebar(model: model)
+                        }
+                        // Pinned from outside: the hairline inside stretches to
+                        // any width it is given, and would bloat the column.
+                        .frame(width: Metrics.sidebarWidth)
+                        Hairline(vertical: true)
+                    }
+
+                    VStack(spacing: 0) {
+                        SessionBar(model: model)
+                        Hairline()
+                        mainArea
+                    }
+
+                    if !model.sidePanelHidden {
+                        Hairline(vertical: true)
+                        SidePanel(model: model)
+                    }
                 }
             case .deck:
+                SessionBar(model: model)
+                Hairline()
                 Overview(model: model)
             }
 
@@ -69,6 +90,24 @@ func openProject(model: WorkspaceModel) {
 
     guard panel.runModal() == .OK, let url = panel.url else { return }
     model.addProject(path: url.path)
+}
+
+/// The sidebar's own top row: the active project's name, on the session bar's
+/// line. The strips below continue this column instead of arguing with it.
+private struct SidebarHeader: View {
+    let model: WorkspaceModel
+
+    var body: some View {
+        Text((model.activeProject?.name ?? "SESSIONS").uppercased())
+            .font(Typography.label)
+            .kerning(1)
+            .foregroundStyle(Palette.faint)
+            .lineLimit(1)
+            .truncationMode(.head)
+            .padding(.horizontal, Metrics.gutter)
+            .frame(width: Metrics.sidebarWidth, height: Metrics.sessionBar, alignment: .leading)
+            .background(Palette.sunken)
+    }
 }
 
 private struct EmptyState: View {

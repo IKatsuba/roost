@@ -46,13 +46,16 @@ struct SidePanel: View {
 
     // MARK: - Header
 
+    // The session bar's height and ground: the panel owns its top row, and the
+    // three columns' headers must read as one line.
     private func header(waiting: Int) -> some View {
         HStack(spacing: 0) {
             tab(.queue, "WAITING", count: waiting, isAlarm: waiting > 0)
             tab(.feed, "ACTIVITY", count: model.activity.count, isAlarm: false)
             Spacer(minLength: 0)
         }
-        .frame(height: Metrics.rowHeight)
+        .frame(height: Metrics.sessionBar)
+        .background(Palette.sunken)
     }
 
     private func tab(_ value: Side, _ title: String, count: Int, isAlarm: Bool) -> some View {

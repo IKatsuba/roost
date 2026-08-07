@@ -85,6 +85,22 @@ struct CommandPalette: View {
             Command(group: "actions", label: "overview of all sessions", hint: nil, status: .none) {
                 model.mode = .deck
             },
+            Command(
+                group: "actions",
+                label: model.sidebarHidden ? "show projects sidebar" : "hide projects sidebar",
+                hint: "⌘B",
+                status: .none
+            ) {
+                model.toggleSidebar()
+            },
+            Command(
+                group: "actions",
+                label: model.sidePanelHidden ? "show side panel" : "hide side panel",
+                hint: "⌘⇧B",
+                status: .none
+            ) {
+                model.toggleSidePanel()
+            },
             Command(group: "actions", label: "new project", hint: "⌘N", status: .none) {
                 openProject(model: model)
             },

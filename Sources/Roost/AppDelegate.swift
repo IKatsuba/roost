@@ -289,6 +289,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(submenu("View") { find in
             find.addItem(action("Command Palette", "k", [.command], #selector(togglePalette)))
             find.addItem(action("Jump to Waiting Agent", "a", [.command, .shift], #selector(nextWaiting)))
+            find.addItem(.separator())
+            find.addItem(action("Toggle Projects Sidebar", "b", [.command], #selector(toggleSidebar)))
+            find.addItem(action("Toggle Side Panel", "b", [.command, .shift], #selector(toggleSidePanel)))
         })
 
         return menu
@@ -349,6 +352,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func nextTab() { model.cycleTab(by: 1) }
     @objc private func previousTab() { model.cycleTab(by: -1) }
     @objc private func nextWaiting() { model.focusNextWaiting() }
+    @objc private func toggleSidebar() { model.toggleSidebar() }
+    @objc private func toggleSidePanel() { model.toggleSidePanel() }
 
     @objc private func selectTabByNumber(_ sender: NSMenuItem) {
         model.selectTab(index: sender.tag)

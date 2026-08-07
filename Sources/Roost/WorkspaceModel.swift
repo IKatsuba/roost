@@ -28,6 +28,10 @@ final class WorkspaceModel {
 
     var mode: Mode = .work
 
+    /// The side columns can be put away when the terminal deserves the room.
+    private(set) var sidebarHidden = false
+    private(set) var sidePanelHidden = false
+
     /// What the overview is narrowed by. nil — show everything.
     var filter: AgentStatus?
 
@@ -148,6 +152,8 @@ final class WorkspaceModel {
         tabs = snapshot.tabs
         activeTabIDs = snapshot.activeTabIDs
         activeProjectID = snapshot.activeProjectID
+        sidebarHidden = snapshot.sidebarHidden
+        sidePanelHidden = snapshot.sidePanelHidden
 
         // The active project may have been removed from the list between runs.
         if let id = activeProjectID, !projects.contains(where: { $0.id == id }) {
@@ -492,6 +498,16 @@ final class WorkspaceModel {
         closePane(paneID)
     }
 
+    func toggleSidebar() {
+        sidebarHidden.toggle()
+        scheduleSave()
+    }
+
+    func toggleSidePanel() {
+        sidePanelHidden.toggle()
+        scheduleSave()
+    }
+
     /// Makes a pane active, switching the project and the tab if need be.
     func focusPane(_ paneID: String) {
         guard let (projectID, tab) = locate(paneID) else { return }
@@ -757,7 +773,9 @@ final class WorkspaceModel {
                 projects: projects,
                 tabs: tabs,
                 activeProjectID: activeProjectID,
-                activeTabIDs: activeTabIDs
+                activeTabIDs: activeTabIDs,
+                sidebarHidden: sidebarHidden,
+                sidePanelHidden: sidePanelHidden
             )
         )
     }
