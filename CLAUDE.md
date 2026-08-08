@@ -207,10 +207,36 @@ over every keystroke.
 
 ### Releases
 
-A release is cut by a tag: `v0.2.2` pushed to the repository runs
-`.github/workflows/release.yml`, which refuses to build unless the tag agrees
-with `CFBundleShortVersionString`, signs, notarises, and leaves the `.zip` on a
-**draft** release for the notes to be written by hand.
+Cutting one, in full:
+
+```sh
+/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 0.2.3' \
+                        -c 'Set :CFBundleVersion 6' tool/Info.plist
+git commit -am 'chore: 0.2.3'
+git push origin main
+git tag v0.2.3 && git push origin v0.2.3
+```
+
+The rest happens on its own: `.github/workflows/release.yml` refuses to build
+unless the tag agrees with `CFBundleShortVersionString`, then signs, notarises,
+staples, and leaves the `.zip` on a **draft** release. Write the notes, publish,
+and `cask.yml` bumps the tap. Nothing else is done by hand — least of all the
+cask.
+
+Two things it needs. The secrets on the repository — `CERTIFICATE` (base64
+`.p12`), `CERTIFICATE_PASSWORD`, `NOTARY_KEY` (base64 `.p8`), `NOTARY_KEY_ID`,
+`NOTARY_ISSUER`, and `TAP_TOKEN` (a fine-grained PAT with contents:write on the
+tap, since `github.token` does not reach past this repository). And patience:
+notarisation is Apple's queue, anywhere from a minute to half an hour, which is
+normal rather than a hang — `xcrun notarytool history --keychain-profile
+roost-notary` answers independently of whatever is waiting on it.
+
+`tool/release.sh` does the same thing locally when CI is not an option; it wants
+the certificate and the `roost-notary` profile in the keychain.
+`ROOST_SKIP_NOTARIZE=1` stops after the signature, and
+`gh workflow run release.yml -f dry_run=true` does the same on a runner —
+worth knowing, because the fragile half of that job is the keychain, not Apple,
+and a dry run answers in two minutes what a full one takes an hour to say.
 
 The signature is the point of the whole path. An ad-hoc bundle is refused as
 damaged on any machine but the one that built it, and Homebrew Cask puts the
