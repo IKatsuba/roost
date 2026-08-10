@@ -31,7 +31,9 @@ cp tool/Info.plist "$APP/Contents/Info.plist"
 cp tool/Roost.icns "$APP/Contents/Resources/Roost.icns"
 
 # SPM puts packages' resource bundles next to the binary; inside an app their
-# place is Contents/Resources, which is where Bundle.module looks for them.
+# place is Contents/Resources. `Bundle.module` does *not* look there — see the
+# comment on Typography.resourceBundle for what it looks at instead and why
+# nothing in this app may use it.
 for BUNDLE in "$BIN_PATH"/*.bundle; do
   [ -e "$BUNDLE" ] || continue
   cp -R "$BUNDLE" "$APP/Contents/Resources/"

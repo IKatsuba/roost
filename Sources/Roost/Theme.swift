@@ -93,15 +93,43 @@ enum Typography {
     ///
     /// Registration is lazy on purpose — the first font asked for is the first
     /// one drawn, and a `static let` runs once, before it.
+    /// What is asked at the end is "can this name be drawn", not "did the
+    /// registration succeed": the two part ways in both directions — the face
+    /// is also here when it is installed on the machine and no bundle was
+    /// found, and a call that returned true says nothing about a .ttf that
+    /// arrived truncated.
     @MainActor private static let registered: Bool = {
-        guard let url = Bundle.module.url(forResource: "GeistMono", withExtension: "ttf") else {
-            return false
+        if let url = resourceBundle?.url(forResource: "GeistMono", withExtension: "ttf") {
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
-        return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        return NSFont(name: "Geist Mono", size: 11.5) != nil
     }()
 
+    /// Deliberately not `Bundle.module`: SwiftPM's accessor for an executable
+    /// target knows two places — the .app's **root** and the absolute
+    /// `.build/…` path of the machine that compiled the binary — and calls
+    /// `fatalError` rather than returning nil when it finds neither. A packaged
+    /// .app keeps resource bundles in `Contents/Resources`, which the accessor
+    /// never looks at, so it lands on the build path: the app launches on the
+    /// Mac that built it and aborts on the first glyph everywhere else. The
+    /// same trap is written up in SwiftTerm's `MetalTerminalRenderer`.
+    ///
+    /// So the bundle is found by hand, and a miss only costs the face.
+    private static let resourceBundle: Bundle? = {
+        let name = "roost_Roost.bundle"
+        let candidates = [
+            Bundle.main.resourceURL?.appendingPathComponent(name),  // inside a .app
+            Bundle.main.bundleURL.appendingPathComponent(name),  // `swift run`, next to the binary
+        ]
+        return candidates.compactMap { $0 }.lazy.compactMap(Bundle.init(url:)).first
+    }()
+
+    /// A name Core Text cannot resolve does not fall back to something close —
+    /// it falls back to Helvetica, and every column in this interface is built
+    /// on equal widths. So a missing face costs the face and nothing else: the
+    /// system's monospaced one keeps the grid standing.
     @MainActor private static func geist(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        _ = registered
+        guard registered else { return .system(size: size, design: .monospaced).weight(weight) }
         return .custom("Geist Mono", size: size).weight(weight)
     }
 
