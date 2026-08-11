@@ -316,6 +316,21 @@ final class WorkspaceModel {
         scheduleSave()
     }
 
+    /// Reorders a project in the sidebar: takes it out and puts it back at
+    /// `index`. Called once, on release — same as `moveTab`, and for the same
+    /// reason.
+    ///
+    /// The `⌘⌥1…9` numbers stay with the slots rather than with the projects:
+    /// they are positions in the list, and the whole point of dragging is to
+    /// choose which project a position belongs to.
+    func moveProject(_ projectID: String, to index: Int) {
+        guard let from = projects.firstIndex(where: { $0.id == projectID }) else { return }
+
+        let project = projects.remove(at: from)
+        projects.insert(project, at: min(max(index, 0), projects.count))
+        scheduleSave()
+    }
+
     func selectProject(_ projectID: String) {
         guard activeProjectID != projectID else { return }
         activeProjectID = projectID
