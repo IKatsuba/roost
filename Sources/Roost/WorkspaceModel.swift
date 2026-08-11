@@ -234,6 +234,16 @@ final class WorkspaceModel {
             .sorted { $0.age > $1.age }
     }
 
+    /// What a quit would interrupt — see [QuitGuard]. The project is named
+    /// alongside the session: a title like "fix the parser" says nothing about
+    /// where it is running when three projects are open at once.
+    var workingNames: [String] {
+        located
+            .filter { $0.status == .working }
+            .sorted { $0.age > $1.age }
+            .map { "\($0.project.name) · \($0.title)" }
+    }
+
     /// Everything for the overview: by urgency, and within it by who has been
     /// in that state the longest.
     var overview: [Located] {
