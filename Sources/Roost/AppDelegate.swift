@@ -156,6 +156,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         hideHint()
     }
 
+    /// Quitting with an agent mid-task is asked about — see [QuitGuard] for
+    /// why only `working` earns the question.
+    ///
+    /// It hangs on terminate rather than on the window's close button: `⌘Q`,
+    /// the Dock's Quit and a logout all arrive here, while closing the window
+    /// only gets here because the app quits after it.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let prompt = QuitGuard.prompt(working: model.workingNames) else {
+            return .terminateNow
+        }
+
+        // The hint is a child of the window and would stay on top of the
+        // dialog: ⌘Q is pressed with ⌘ held, which is exactly what raises it.
+        hideHint()
+
+        let alert = NSAlert()
+        alert.messageText = prompt.title
+        alert.informativeText = prompt.body
+        alert.addButton(withTitle: "quit")
+        // The second button is the one Esc and Return-on-default pick — the
+        // safe answer is the accidental one.
+        alert.addButton(withTitle: "cancel")
+        alert.buttons.last?.keyEquivalent = "\r"
+        alert.buttons.first?.keyEquivalent = ""
+
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         model.save()
     }
