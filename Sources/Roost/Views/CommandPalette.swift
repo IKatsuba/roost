@@ -325,7 +325,13 @@ struct CommandPalette: View {
                     // anchor scrolls the least it can: the viewport moves only
                     // when the selection has actually left it, and wrapping
                     // round the ends lands where it says it does.
-                    .onChange(of: selected, initial: true) {
+                    // Not `initial: true`: the first scroll lands in the same
+                    // pass as `onAppear`'s focus and takes the first responder
+                    // from the text field — the palette opened with nowhere to
+                    // type until it was clicked into. It bought nothing anyway:
+                    // a palette opens with the selection at zero and the list
+                    // already at the top.
+                    .onChange(of: selected) {
                         scroll.scrollTo(selected, anchor: nil)
                     }
                     // A new query brings new rows under the same indices, so
