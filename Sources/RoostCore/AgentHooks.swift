@@ -249,7 +249,10 @@ public func statusForEvent(_ event: String, notification: String? = nil) -> Agen
         }
 
     // The turn is over, but nobody has read the output yet — that is `done`,
-    // not rest. It becomes `idle` once a human opens the pane.
+    // not rest. It holds until the agent starts on something else: opening the
+    // pane used to clear it, and that lied — a tab reached by closing its
+    // neighbour, or a four-way split where one pane was read, went quiet for
+    // work nobody had looked at.
     case "Stop":
         return .done
 

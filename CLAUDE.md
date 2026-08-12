@@ -87,9 +87,12 @@ whatever happens: **it stands in the agent's way**, and hanging here means
 hanging the session.
 
 The event table is `statusForEvent`. A subtlety of meaning: `Stop` is `done`
-("the output is written, but nobody has read it"), not rest; it turns into
-`idle` when a human opens the tab. A red `waiting` means exactly one thing:
-nothing moves without a human.
+("the output is written, but nobody has read it"), not rest; it holds until the
+agent itself starts on something else. Opening the tab used to clear it, and
+that was wrong twice over: it cleared every pane of a split when one had been
+read, and it fired on arrivals nobody chose — the neighbour you land on after
+closing a tab, a fresh split, a change of focus. A red `waiting` means exactly
+one thing: nothing moves without a human.
 
 ### Launching a pane
 
