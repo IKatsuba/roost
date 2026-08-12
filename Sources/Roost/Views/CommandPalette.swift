@@ -19,9 +19,11 @@ struct CommandPalette: View {
 
     @FocusState private var focused: Bool
 
-    private struct Command: Identifiable {
-        let id = UUID()
-
+    /// Rows carry no identity of their own: `matches` is rebuilt on every draw,
+    /// so anything stored in them would be a fresh value each pass — the very
+    /// thing that used to make the list churn. The position in the list is the
+    /// identity instead, and it is also what the selection is an index into.
+    private struct Command {
         /// The group's header: the project's name for panes, "actions" for the
         /// rest.
         let group: String
@@ -284,29 +286,54 @@ struct CommandPalette: View {
                     .padding(Metrics.gutter)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(matches.enumerated()), id: \.element.id) { index, command in
-                            // The header is printed when the group changes:
-                            // that shows which project a row comes from without
-                            // repeating it on every one.
-                            if index == 0 || matches[index - 1].group != command.group {
-                                Text(command.group.uppercased())
-                                    .font(Typography.label)
-                                    .kerning(1)
-                                    .foregroundStyle(Palette.faint)
-                                    .padding(.horizontal, 12)
-                                    .padding(.top, 9)
-                                    .padding(.bottom, 5)
-                            }
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(matches.enumerated()), id: \.offset) { index, command in
+                                // The header travels with the row rather than
+                                // beside it, so that scrolling to the first row
+                                // of a group brings the name of that group along
+                                // — otherwise the list stops one line short and
+                                // the row arrives unlabelled.
+                                VStack(alignment: .leading, spacing: 0) {
+                                    // The header is printed when the group
+                                    // changes: that shows which project a row
+                                    // comes from without repeating it on every
+                                    // one.
+                                    if index == 0 || matches[index - 1].group != command.group {
+                                        Text(command.group.uppercased())
+                                            .font(Typography.label)
+                                            .kerning(1)
+                                            .foregroundStyle(Palette.faint)
+                                            .padding(.horizontal, 12)
+                                            .padding(.top, 9)
+                                            .padding(.bottom, 5)
+                                    }
 
-                            row(command, isSelected: index == selected)
-                                .onTapGesture { run(matches, at: index) }
+                                    row(command, isSelected: index == selected)
+                                        .onTapGesture { run(matches, at: index) }
+                                }
+                                .id(index)
+                            }
                         }
                     }
+                    .scrollIndicators(.never)
+                    .frame(maxHeight: 320)
+                    // The arrows move an index; without this the list stayed
+                    // where it was and everything past the fold was driven
+                    // blind — `Return` running a row nobody could see. A nil
+                    // anchor scrolls the least it can: the viewport moves only
+                    // when the selection has actually left it, and wrapping
+                    // round the ends lands where it says it does.
+                    .onChange(of: selected, initial: true) {
+                        scroll.scrollTo(selected, anchor: nil)
+                    }
+                    // A new query brings new rows under the same indices, so
+                    // the offset survives what it was measured against:
+                    // filtering while scrolled would leave the top out of
+                    // sight, selection or no selection.
+                    .onChange(of: state.query) { scroll.scrollTo(selected, anchor: nil) }
                 }
-                .scrollIndicators(.never)
-                .frame(maxHeight: 320)
             }
         }
         .frame(width: 520)
