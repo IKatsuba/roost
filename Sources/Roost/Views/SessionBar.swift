@@ -1,12 +1,11 @@
 import RoostCore
 import SwiftUI
 
-/// The strip under the window: the active project's sessions in "work", the
-/// filters in "overview".
+/// The strip under the window: the active project's sessions.
 ///
 /// Two rows, two jobs: the upper one belongs to the window, this one to the
-/// view. In the overview there is no single project, and tabs would have
-/// nothing to lean on there.
+/// project. The overview does without it — there is no single project there for
+/// tabs to lean on, and the columns head themselves.
 struct SessionBar: View {
     let model: WorkspaceModel
 
@@ -23,33 +22,11 @@ struct SessionBar: View {
     @State private var tabFrames: [String: CGRect] = [:]
 
     var body: some View {
-        HStack(spacing: 0) {
-            switch model.mode {
-            case .work:
-                // The project's name is not here: in "work" the bar is one of
-                // three columns, and the name heads the sidebar's own column.
-                tabs
-            case .deck:
-                label("SHOW")
-                Hairline(vertical: true)
-                filters
-            }
-        }
-        .frame(height: Metrics.sessionBar)
-        .background(Palette.sunken)
-    }
-
-    /// The header is exactly the sidebar's width — the strips below continue
-    /// its column instead of arguing with it.
-    private func label(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(Typography.label)
-            .kerning(1)
-            .foregroundStyle(Palette.faint)
-            .lineLimit(1)
-            .truncationMode(.head)
-            .padding(.horizontal, Metrics.gutter)
-            .frame(width: Metrics.sidebarWidth, alignment: .leading)
+        // The project's name is not here: the bar is one of three columns, and
+        // the name heads the sidebar's own column.
+        tabs
+            .frame(height: Metrics.sessionBar)
+            .background(Palette.sunken)
     }
 
     private var tabs: some View {
@@ -107,50 +84,6 @@ struct SessionBar: View {
             .buttonStyle(.plain)
             .help("New claude session — ⌘T")
         }
-    }
-
-    private var filters: some View {
-        let counts = model.statusCounts
-
-        return HStack(spacing: 0) {
-            filter(nil, "All", count: counts.values.reduce(0, +))
-            ForEach([AgentStatus.waiting, .working, .done, .idle], id: \.self) { status in
-                filter(status, status.rawValue.capitalized, count: counts[status] ?? 0)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func filter(_ status: AgentStatus?, _ title: String, count: Int) -> some View {
-        let isActive = model.filter == status
-
-        return Button {
-            model.filter = status
-        } label: {
-            HStack(spacing: 7) {
-                if let status { AgentMark(status: status) }
-                Text(title)
-                    .font(Typography.item)
-                    .foregroundStyle(isActive ? Palette.text : Palette.muted)
-                Text("\(count)")
-                    .font(Typography.label)
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.faint)
-            }
-            .padding(.horizontal, 12)
-            .frame(maxHeight: .infinity)
-            .background(isActive ? Palette.terminal : .clear)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(isActive ? Palette.accent : .clear)
-                    .frame(height: Metrics.marker)
-            }
-            // Otherwise only the label is clickable: a transparent background
-            // has no hit area of its own.
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .trailing) { Hairline(vertical: true) }
     }
 
     /// Not the system drag-and-drop but a plain gesture: the strip reorders

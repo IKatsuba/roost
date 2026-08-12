@@ -47,9 +47,6 @@ final class WorkspaceModel {
 
     var sidePanelView: SidePanelView = .queue
 
-    /// What the overview is narrowed by. nil — show everything.
-    var filter: AgentStatus?
-
     /// One line of the feed: who switched to what.
     struct Activity: Identifiable, Sendable {
         let id = UUID()
@@ -267,16 +264,24 @@ final class WorkspaceModel {
             .map { "\($0.project.name) · \($0.title)" }
     }
 
-    /// Everything for the overview: by urgency, and within it by who has been
-    /// in that state the longest.
-    var overview: [Located] {
-        located
-            .filter { filter == nil || $0.status == filter }
-            .sorted {
-                $0.status.urgency != $1.status.urgency
-                    ? $0.status.urgency < $1.status.urgency
-                    : $0.age > $1.age
-            }
+    /// The overview's columns: every claude session standing under the state it
+    /// is in.
+    ///
+    /// A shell pane is left out by its **kind** rather than by its status: a
+    /// claude pane whose tab has never been opened has no session and therefore
+    /// no status either, and dropping everything stateless would empty the
+    /// overview after a restart.
+    var columns: [AgentStatus: [Located]] {
+        var columns: [AgentStatus: [Located]] = [:]
+
+        for item in located where item.pane.kind == .claude {
+            columns[item.status.column, default: []].append(item)
+        }
+
+        // Freshest on top — the mirror of [waitingQueue], and deliberately so.
+        // That one is a queue, where the oldest debt is the one to pay first;
+        // a column is read as news, where what has just changed comes first.
+        return columns.mapValues { $0.sorted { $0.age < $1.age } }
     }
 
     /// The palette needs the whole list regardless of the overview's filter.
