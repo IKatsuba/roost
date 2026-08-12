@@ -49,14 +49,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// A click on a pane makes it active. A monitor rather than a SwiftUI
     /// gesture: the event is only observed and travels on to the terminal
     /// untouched.
+    ///
+    /// The event's location goes into `hitTest` as it comes, without being
+    /// converted: `hitTest` asks for a point in the **superview's** system, and
+    /// the content view's superview is the window's frame — the very system
+    /// `locationInWindow` is already in. Converting it into the content view
+    /// first looks like the careful thing to do and is exactly the trap:
+    /// `NSHostingView` is flipped, so the conversion mirrors y, and a click in
+    /// the upper pane of a `⌘⇧D` split made the lower one active. A `⌘D` split
+    /// hid it — mirroring y leaves left and right where they were.
     private func watchClicks() {
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) {
             [weak self] event in
-            if let self, let root = event.window?.contentView {
-                let point = root.convert(event.locationInWindow, from: nil)
-                if let hit = root.hitTest(point) {
-                    MainActor.assumeIsolated { self.model.focusPane(containing: hit) }
-                }
+            if let self, let root = event.window?.contentView,
+               let hit = root.hitTest(event.locationInWindow) {
+                MainActor.assumeIsolated { self.model.focusPane(containing: hit) }
             }
             return event
         }
