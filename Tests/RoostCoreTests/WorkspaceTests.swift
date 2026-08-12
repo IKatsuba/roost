@@ -158,3 +158,32 @@ struct WorkspaceSnapshotTests {
         #expect(Project.uniqueName("foo", among: ["foo", "foo 3"]) == "foo 2")
     }
 }
+
+@Suite("agent status")
+struct AgentStatusTests {
+    @Test("a live state stands in the column of its own name")
+    func liveStatesKeepTheirColumn() {
+        #expect(AgentStatus.waiting.column == .waiting)
+        #expect(AgentStatus.working.column == .working)
+        #expect(AgentStatus.done.column == .done)
+        #expect(AgentStatus.idle.column == .idle)
+    }
+
+    @Test("a session that is over and one that never started both count as idle")
+    func quietStatesFallIntoIdle() {
+        #expect(AgentStatus.exited.column == .idle)
+        // A claude pane whose tab has never been opened has no session and so
+        // no status — it belongs on the overview all the same, and this is the
+        // column it belongs in.
+        #expect(AgentStatus.none.column == .idle)
+    }
+
+    @Test("the columns are the four states worth one, in order of urgency")
+    func columnsRunByUrgency() {
+        #expect(AgentStatus.columns == [.waiting, .working, .done, .idle])
+        #expect(AgentStatus.columns.map(\.urgency) == [0, 1, 2, 3])
+        // Every column heads itself: nothing in the list maps elsewhere, or a
+        // card would land under a header that is not its own.
+        #expect(AgentStatus.columns.allSatisfy { $0.column == $0 })
+    }
+}

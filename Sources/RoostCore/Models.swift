@@ -87,7 +87,7 @@ public enum AgentStatus: String, Codable, Hashable, Sendable {
     /// The session is over.
     case exited
 
-    /// Order of urgency — it sorts the overview and the palette.
+    /// Order of urgency — it sorts the overview's columns and the palette.
     public var urgency: Int {
         switch self {
         case .waiting: 0
@@ -98,6 +98,29 @@ public enum AgentStatus: String, Codable, Hashable, Sendable {
         case .exited: 5
         }
     }
+
+    /// The overview's column this state stands in.
+    ///
+    /// Three states fall together into [idle], and none of them is a mistake:
+    /// an [exited] session says what an idle one says — nothing is happening
+    /// here — and so does [none], which on a claude pane means the tab has
+    /// never been opened and the session has not started yet. A shell pane is
+    /// [none] too, and it is dropped from the overview by its kind before this
+    /// is ever asked: dropping it by its status would take every unopened
+    /// claude pane with it, and after a restart that is nearly all of them.
+    public var column: AgentStatus {
+        switch self {
+        case .waiting: .waiting
+        case .working: .working
+        case .done: .done
+        case .idle, .exited, .none: .idle
+        }
+    }
+
+    /// The states worth a column of their own, in order of urgency — the
+    /// overview's columns, the status bar's counts and the palette's marks all
+    /// walk this list.
+    public static let columns: [AgentStatus] = [.waiting, .working, .done, .idle]
 }
 
 /// The description of one pane — that is, of one live session.

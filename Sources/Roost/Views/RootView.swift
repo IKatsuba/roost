@@ -43,8 +43,10 @@ struct RootView: View {
                     }
                 }
             case .deck:
-                SessionBar(model: model)
-                Hairline()
+                // No session bar over it: in the overview there is no single
+                // project for tabs to lean on, and the columns own that line
+                // themselves — their headers are the row, exactly as the
+                // sidebar's and the side panel's are in "work".
                 Overview(model: model)
             }
 
@@ -161,7 +163,7 @@ private struct StatusBar: View {
             // A summary across every project, not just the visible one: an
             // agent's question in a background tab would otherwise go unnoticed.
             let counts = model.statusCounts
-            ForEach([AgentStatus.waiting, .working, .done, .idle], id: \.self) { status in
+            ForEach(AgentStatus.columns, id: \.self) { status in
                 if let count = counts[status], count > 0 {
                     HStack(spacing: 5) {
                         AgentMark(status: status)
