@@ -184,6 +184,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 
+    /// The usage ledger is deliberately not saved here: it is a cache of what
+    /// the transcripts already say, and writing it would mean blocking the quit
+    /// on a background actor that may be mid-scan. Whatever the last periodic
+    /// save missed is read again from the files on the next launch.
     func applicationWillTerminate(_ notification: Notification) {
         model.save()
     }

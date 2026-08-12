@@ -1,21 +1,22 @@
 import RoostCore
 import SwiftUI
 
-/// The right-hand strip: two views of one and the same thing.
+/// The right-hand strip: three views of one and the same work.
 ///
 /// The queue is a list of debts: who ran into a question and has waited the
 /// longest. The feed is the same thing over time: who started, who finished, who
-/// dropped out. The first answers "what is needed from me right now", the second
-/// "what is going on at all".
+/// dropped out. The spend is what all of it cost. The first answers "what is
+/// needed from me right now", the second "what is going on at all", the third
+/// "what has it come to".
 struct SidePanel: View {
     let model: WorkspaceModel
 
-    enum Side: Hashable {
-        case queue
-        case feed
-    }
+    /// Which view is showing is kept in the model, not here: the meter along
+    /// the bottom of the window opens this panel on the spending, and a
+    /// `@State` of its own would be unreachable from there.
+    private typealias Side = WorkspaceModel.SidePanelView
 
-    @State private var side: Side = .queue
+    private var side: Side { model.sidePanelView }
 
     /// Age runs in seconds, so the column is driven by a timer rather than by
     /// changes in the model.
@@ -33,6 +34,7 @@ struct SidePanel: View {
             switch side {
             case .queue: queueBody(queue)
             case .feed: feedBody
+            case .spend: SpendPanel(model: model)
             }
 
             Spacer(minLength: 0)
@@ -52,17 +54,21 @@ struct SidePanel: View {
         HStack(spacing: 0) {
             tab(.queue, "WAITING", count: waiting, isAlarm: waiting > 0)
             tab(.feed, "ACTIVITY", count: model.activity.count, isAlarm: false)
+            // No count beside this one: three labels and three numbers do not
+            // fit the column, and the number this tab would carry is the one
+            // the status bar already holds.
+            tab(.spend, "SPEND", count: nil, isAlarm: false)
             Spacer(minLength: 0)
         }
         .frame(height: Metrics.sessionBar)
         .background(Palette.sunken)
     }
 
-    private func tab(_ value: Side, _ title: String, count: Int, isAlarm: Bool) -> some View {
+    private func tab(_ value: Side, _ title: String, count: Int?, isAlarm: Bool) -> some View {
         let isActive = side == value
 
         return Button {
-            side = value
+            model.sidePanelView = value
         } label: {
             HStack(spacing: 6) {
                 if value == .queue { AgentMark(status: .waiting) }
@@ -72,10 +78,12 @@ struct SidePanel: View {
                     .kerning(1)
                     .foregroundStyle(isActive ? Palette.text : Palette.faint)
 
-                Text("\(count)")
-                    .font(Typography.label)
-                    .monospacedDigit()
-                    .foregroundStyle(isAlarm ? Palette.text : Palette.faint)
+                if let count {
+                    Text("\(count)")
+                        .font(Typography.label)
+                        .monospacedDigit()
+                        .foregroundStyle(isAlarm ? Palette.text : Palette.faint)
+                }
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)
@@ -152,6 +160,16 @@ struct SidePanel: View {
                 Spacer()
                 Text(model.activity.last.map { "\(formatAge(now.timeIntervalSince($0.at))) back" }
                     ?? "empty")
+                    .monospacedDigit()
+            case .spend:
+                // The one caveat the panel owes a human: a subscription is not
+                // billed per token, so every figure above is what the same work
+                // would have cost on the API.
+                Text("list price · not a bill")
+                Spacer()
+                Text(model.usage.snapshot.total.usage.isEmpty
+                    ? "counting…"
+                    : formatCost(model.usage.snapshot.total.cost))
                     .monospacedDigit()
             }
         }

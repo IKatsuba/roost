@@ -84,6 +84,16 @@ public enum SessionCatalog {
         return current == legacy ? [current] : [current, legacy]
     }
 
+    /// Every directory this project's sessions could be kept in — its own, and
+    /// one per worktree.
+    ///
+    /// The counterpart of [sessions(forProject:)] for anything that walks the
+    /// catalog itself rather than asking for records: for a human a branch is
+    /// the same project, so its spending belongs under the same name.
+    public static func directoryNames(ofProject project: String) -> [String] {
+        places(of: project).flatMap { directoryNames(for: $0.cwd) }
+    }
+
     /// The session directory of this path: the one that exists on disk,
     /// otherwise the one that will.
     public static func directory(for cwd: String, root: URL = defaultRoot) -> URL {
