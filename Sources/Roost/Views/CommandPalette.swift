@@ -35,6 +35,12 @@ struct CommandPalette: View {
         let hint: String?
 
         let status: AgentStatus
+
+        /// The session this row is about — what `⌥⏎` puts on the pasteboard.
+        /// A live claude pane, a record from the catalogue and a pasted uuid
+        /// all name one; an action or a branch names none.
+        var sessionID: String?
+
         let run: () -> Void
     }
 
@@ -55,6 +61,7 @@ struct CommandPalette: View {
                 label: item.title,
                 hint: item.tab.paneCount > 1 ? "split" : nil,
                 status: item.status,
+                sessionID: item.pane.agentSessionID,
                 run: { model.focusPane(item.pane.id) }
             )
         }
@@ -81,6 +88,13 @@ struct CommandPalette: View {
             Command(group: "actions", label: "close pane", hint: "⌘W", status: .none) {
                 model.closeActivePane()
             },
+        ]
+
+        // Next to the actions about the pane one is standing in: the id it is
+        // asked for is that pane's.
+        commands += [copySessionID].compactMap { $0 }
+
+        commands += [
             Command(group: "actions", label: "jump to waiting agent", hint: "⌘⇧A", status: .none) {
                 model.focusNextWaiting()
             },
@@ -125,6 +139,37 @@ struct CommandPalette: View {
         return commands + sessions
     }
 
+    /// The id of the session one is sitting in.
+    ///
+    /// The palette already reads ids — a pasted uuid is a command in itself,
+    /// see [pasted] — and this is the same road the other way: continuing a
+    /// session on another machine, quoting it in an issue, `claude --resume` in
+    /// a terminal of one's own. Until now the only way to the id was
+    /// `workspace.json` by hand.
+    ///
+    /// Neither the overview card nor the side panel shows it, truncated or
+    /// whole: an id is not read, it is taken. The card answers "which session
+    /// is this" with a title, an age and the model it spends on, and eight hex
+    /// characters would crowd that without answering anything else. This row
+    /// answers "give it to me" — the only question an id is the answer to.
+    ///
+    /// A shell pane has no id and gets no row: an action that is there but
+    /// cannot be run is worse than one that is not.
+    private var copySessionID: Command? {
+        guard let id = model.activeTab?.activePane.agentSessionID else { return nil }
+
+        return Command(
+            group: "actions",
+            label: "copy session id",
+            // The hint holds a shortcut everywhere else, and here it teaches
+            // the modifier: a gesture nobody sees is a gesture nobody uses,
+            // and the row a human finds by typing "copy" is where they will
+            // look for it.
+            hint: "⌥⏎ on a session row",
+            status: .none
+        ) { copy(id) }
+    }
+
     /// The project's sessions as they lie on disk.
     private var sessions: [Command] {
         model.knownSessions.map { record in
@@ -137,7 +182,8 @@ struct CommandPalette: View {
                 // without knowing which tree it edited files in is a sure way
                 // to be surprised.
                 hint: record.worktree.map { "\($0) · \(age)" } ?? age,
-                status: .none
+                status: .none,
+                sessionID: record.id
             ) { model.resume(record) }
         }
     }
@@ -197,16 +243,21 @@ struct CommandPalette: View {
         // human would find out only by not finding their conversation in it.
         switch SessionCatalog.resolve(query, project: project.path) {
         case .here(let record):
-            return Command(group: "sessions", label: label, hint: record.title, status: .none) {
-                model.resume(record)
-            }
+            return Command(
+                group: "sessions",
+                label: label,
+                hint: record.title,
+                status: .none,
+                sessionID: record.id
+            ) { model.resume(record) }
 
         case .elsewhere(let path):
             return Command(
                 group: "sessions",
                 label: label,
                 hint: "another project — reveal",
-                status: .none
+                status: .none,
+                sessionID: query
             ) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
 
         case .missing(let directory):
@@ -214,7 +265,8 @@ struct CommandPalette: View {
                 group: "sessions",
                 label: label,
                 hint: "no transcript — open folder",
-                status: .none
+                status: .none,
+                sessionID: query
             ) { reveal(directory) }
         }
     }
@@ -311,7 +363,17 @@ struct CommandPalette: View {
                                     }
 
                                     row(command, isSelected: index == selected)
-                                        .onTapGesture { run(matches, at: index) }
+                                        // The modifier is read at the press
+                                        // rather than tracked: an option-click
+                                        // copies the row's id the same way
+                                        // `⌥⏎` does.
+                                        .onTapGesture {
+                                            run(
+                                                matches,
+                                                at: index,
+                                                copying: NSEvent.modifierFlags.contains(.option)
+                                            )
+                                        }
                                 }
                                 .id(index)
                             }
@@ -346,9 +408,13 @@ struct CommandPalette: View {
             // the arrows do: in the window. The matches are counted at the
             // moment of the press, so that the closure does not hold on to a
             // stale list.
-            state.submit = {
+            state.submit = { copying in
                 let matches = self.matches
-                run(matches, at: min(state.selection, max(matches.count - 1, 0)))
+                run(
+                    matches,
+                    at: min(state.selection, max(matches.count - 1, 0)),
+                    copying: copying
+                )
             }
         }
         // Only whoever counted the matches knows the bounds of the selection —
@@ -395,12 +461,34 @@ struct CommandPalette: View {
         .contentShape(Rectangle())
     }
 
-    private func run(_ matches: [Command], at index: Int) {
+    private func run(_ matches: [Command], at index: Int, copying: Bool = false) {
         guard matches.indices.contains(index) else { return }
+
+        if copying {
+            // A row that names no session has nothing to copy, and running it
+            // instead would be the worst reading of a held modifier: `⌥⏎` on
+            // "close pane" would close it.
+            guard let sessionID = matches[index].sessionID else { return }
+
+            copy(sessionID)
+            // Nothing moved the focus, so the pane gets it back — unlike a
+            // command, which takes it itself.
+            dismiss(true)
+            return
+        }
+
         // Closed before running: a command may move the focus, and the palette
         // on top of it would be exactly what gets in the way.
         dismiss(false)
         matches[index].run()
+    }
+
+    /// The id goes to the pasteboard bare, with no `--resume` around it: it is
+    /// pasted back into this same palette as often as into a shell, and adding
+    /// the flag there is four characters while stripping it is eight.
+    private func copy(_ sessionID: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sessionID, forType: .string)
     }
 }
 
@@ -434,8 +522,9 @@ final class PaletteState {
     var count = 0
 
     /// Running the selected row: the window catches the press, but only the
-    /// view knows what to run.
-    @ObservationIgnored var submit: (() -> Void)?
+    /// view knows what to run. The flag is the option key held with `Return` —
+    /// "copy the id, do not open it", see [CommandPalette].
+    @ObservationIgnored var submit: ((_ copying: Bool) -> Void)?
 
     init(scope: Scope = .everything) {
         self.scope = scope

@@ -489,7 +489,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case 53: closePalette(refocus: true)
         case 125: paletteState?.move(1)
         case 126: paletteState?.move(-1)
-        case 36, 76: paletteState?.submit?()
+        // The option key travels with the press: on a row that names a session
+        // it means "copy the id" instead of "open it".
+        case 36, 76: paletteState?.submit?(event.modifierFlags.contains(.option))
         default: return false
         }
         return true
