@@ -152,6 +152,12 @@ private struct StatusBar: View {
 
             Spacer(minLength: 12)
 
+            // The ceilings belong here rather than in the window bar: they are
+            // a property of the machine, like the counts beside them, and not
+            // of the session in front of you.
+            UsageMeter(model: model)
+                .padding(.trailing, 4)
+
             // A summary across every project, not just the visible one: an
             // agent's question in a background tab would otherwise go unnoticed.
             let counts = model.statusCounts

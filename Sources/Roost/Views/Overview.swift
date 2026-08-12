@@ -85,6 +85,34 @@ private struct OverviewCard: View {
                 .font(Typography.label)
                 .foregroundStyle(Palette.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                // What the session has come to, on the card's bottom line.
+                // Only where there is something to say: a shell pane has no
+                // spending, and a claude one that has not answered yet would
+                // otherwise carry a confident zero.
+                if let spend {
+                    HStack(spacing: 6) {
+                        Text(formatTokens(spend.usage.total))
+                            .foregroundStyle(Palette.muted)
+                        Text("·")
+                            .foregroundStyle(Palette.faint)
+                        Text(spend.cost.map(formatCost) ?? "")
+                            .foregroundStyle(Palette.text)
+
+                        Spacer(minLength: 6)
+
+                        // The model is the reason two sessions of the same
+                        // length cost differently — it belongs next to the
+                        // money rather than in a panel elsewhere.
+                        if let model = spend.models.first?.model {
+                            Text(shortened(model))
+                                .foregroundStyle(Palette.faint)
+                                .lineLimit(1)
+                        }
+                    }
+                    .font(Typography.label)
+                    .monospacedDigit()
+                }
             }
             .padding(.horizontal, 10)
             .padding(.top, 9)
@@ -112,5 +140,20 @@ private struct OverviewCard: View {
     /// output.
     private var lines: [String] {
         item.session?.recentLines(4) ?? ["session not started"]
+    }
+
+    /// What this pane's session has spent, if it has spent anything.
+    private var spend: UsageLedger.Session? {
+        guard let id = item.pane.agentSessionID,
+            let session = model.usage.snapshot.sessions[id],
+            !session.usage.isEmpty
+        else { return nil }
+
+        return session
+    }
+
+    /// `claude-` is on every model's name and buys nothing on a card.
+    private func shortened(_ model: String) -> String {
+        model.hasPrefix("claude-") ? String(model.dropFirst("claude-".count)) : model
     }
 }

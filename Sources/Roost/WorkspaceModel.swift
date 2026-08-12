@@ -15,6 +15,11 @@ final class WorkspaceModel {
     /// not raise a dozen processes at once.
     private(set) var sessions: [String: TerminalSession] = [:]
 
+    /// What the agents have spent — the transcripts counted, and the ceilings
+    /// asked for. Kept beside the sessions rather than inside them: the window
+    /// a subscription is measured in belongs to the machine, not to a pane.
+    let usage = UsageTracker()
+
     var isPaletteOpen = false
 
     /// What to show in the body of the window.
@@ -31,6 +36,16 @@ final class WorkspaceModel {
     /// The side columns can be put away when the terminal deserves the room.
     private(set) var sidebarHidden = false
     private(set) var sidePanelHidden = false
+
+    /// Which of the side panel's three views is showing — the debts, the feed,
+    /// or the spending. See [showSpending].
+    enum SidePanelView: Hashable {
+        case queue
+        case feed
+        case spend
+    }
+
+    var sidePanelView: SidePanelView = .queue
 
     /// What the overview is narrowed by. nil — show everything.
     var filter: AgentStatus?
@@ -87,6 +102,7 @@ final class WorkspaceModel {
         }
 
         restore()
+        usage.start()
     }
 
     private func apply(_ event: HookEvent) {
@@ -98,7 +114,14 @@ final class WorkspaceModel {
 
         // Only state changes go into the feed. A working agent pokes the hook
         // on every tool, and "started, started, started" would say nothing.
-        if session.status != before { record(session) }
+        if session.status != before {
+            record(session)
+
+            // An agent that has just stopped has written the last of what it
+            // spent. Catching up here rather than waiting out the tick is what
+            // makes the counter agree with the reply a human is reading.
+            if session.status == .done { usage.poke() }
+        }
     }
 
     /// Writes a line into the feed. The project and the title are copied as
@@ -530,6 +553,19 @@ final class WorkspaceModel {
 
     func toggleSidePanel() {
         sidePanelHidden.toggle()
+        scheduleSave()
+    }
+
+    /// Opens the side panel on the spending, wherever it was before.
+    ///
+    /// Which view the panel is on lives here rather than in the view itself so
+    /// that something outside it — the meter along the bottom of the window —
+    /// can send a human to the numbers behind the one they clicked. It is not
+    /// saved: the panel comes back on the queue, which is what a new day starts
+    /// with.
+    func showSpending() {
+        sidePanelHidden = false
+        sidePanelView = .spend
         scheduleSave()
     }
 

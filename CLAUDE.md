@@ -150,6 +150,90 @@ The name is sanitised twice — on input and at the command itself
 (`Worktree.sanitize`). It travels into a shell string inside single quotes,
 while the snapshot is ordinary json a quote can be typed into by hand.
 
+### What it costs
+
+Two halves from two places, and neither is optional. Anthropic reports
+**percentages** and no tokens; the transcripts hold **tokens** and no ceiling.
+Neither number answers "how much is left, and what did it go on" alone.
+
+The tokens are counted out of the same `~/.claude/projects` files
+`SessionCatalog` reads for names: every reply carries a `usage` block. Three
+things about that are worth knowing before touching `UsageScan`.
+
+**Nearly half of the replies are written twice.** In this repository's own
+transcripts, 1877 of 4227 were duplicates — byte-identical copies of a reply
+already recorded, always within the same file. Counting them as they come puts
+the bill at almost double. They are recognised by `messageId:requestId` and
+merged field by field rather than skipped: a streamed copy carries the counters
+as they stood when it was written, so the largest of each field is the true one.
+
+**A session is not one file.** Every subagent gets a transcript of its own under
+`<uuid>/subagents/`, and that is where parallel work goes — walking only the top
+level lost 17% of the tokens and 29% of the money here. They count against the
+session that spawned them: for a human that is one piece of work. `journal.jsonl`
+sits among them and looks the same, but it is the orchestration log and has no
+usage in it.
+
+**The scan is written over raw bytes on purpose.** 1.3 GB of transcripts, single
+lines up to 1.6 MB. `Data.split` plus `contains` took 178 seconds; `memchr` for
+the line breaks and `memmem` for the one substring that matters took 12, over
+four times the files. The first pass is the expensive one — after it each file
+is re-read from the offset it stopped at, and catching up costs a fifth of a
+second.
+
+**The count is kept in `usage.json`**, beside the workspace snapshot: per-file
+offsets, the totals, and the records of the last week. Without it every launch
+re-read the gigabyte — with it a launch is 0.04 s instead of 12. Only offsets
+are saved, never the dedup keys: those recognise a duplicate on a second pass
+over the same bytes, and those bytes are never read again. Records are written
+without their keys too, as `[time, model, …five counts]` rows — a third of the
+file for an answer nobody asks twice. The file is a cache and nothing else: a
+version bump, a truncated write or a missing file all mean the same thing, one
+slow launch, which is why quitting does not block to write it.
+
+Money is a **list price, not a bill**: a subscription pays nothing per token.
+It is shown anyway because it is the only thing that puts a cache read and an
+output token on one scale. The rates are per family (`opus`, `sonnet`, `haiku`,
+`fable`) rather than per model id, matched by substring — ids turn over every
+few months, and a table keyed by the exact one would answer "free" for a model
+it had never heard of. Cache is priced by multiplier: ×1.25 for a five-minute
+write, ×2 for an hour's, ×0.1 for a read.
+
+The ceilings come from `api.anthropic.com/api/oauth/usage` with the token Claude
+Code already has — the same request its own `/usage` makes. Two decisions there:
+
+The keychain is read by running **`/usr/bin/security`**, not through
+`SecItemCopyMatching`. The entry was written by Claude Code, so its access list
+names Claude Code; anybody else asking directly gets the "wants to use your
+confidential information" dialog. Asked through `security`, the permission a
+human grants once belongs to `security` — which every other tool on the machine
+already goes through.
+
+**The token is used and never refreshed**, which is the one thing the tools that
+do this get wrong. The refresh token is rotated on use: spend it and the copy in
+the keychain is dead, so a bug in the write-back logs a human out of the very
+agent this app exists to run. An expired token is reported as expired, and the
+next read finds the one Claude Code has already put there — it is refreshing it
+anyway, in the pane next door.
+
+Three places show it, because it answers three different questions. **How much
+is left** is the status bar: both windows, percentage and reset, muted — and the
+window past four fifths set in full text colour, the same trick the count of
+waiting agents uses instead of a hue. It is deliberately not in the window bar,
+which holds only the path and the view switch: a percentage that is always on
+screen is news about one afternoon in ten. **What this session came to** is the
+card in the overview, on its bottom line, next to the model that explains why
+two sessions of the same length cost differently. **Where it all went** is the
+`SPEND` view of the right-hand strip, beside the queue and the feed: the windows
+with what they cost, the current session split by model, the open sessions
+dearest first, then the projects. The strip's footer carries the caveat the
+numbers owe — *list price, not a bill*.
+
+The five-hour window's boundaries are taken from the API's `resets_at` when
+there is one, and the tokens are summed inside them. That is the only way the
+two halves agree: a window opens at the first request after the last one closed,
+which is not the same as five hours ago.
+
 ### Looks
 
 The app wears [katsuba.dev](https://katsuba.dev)'s design: the same neutral
