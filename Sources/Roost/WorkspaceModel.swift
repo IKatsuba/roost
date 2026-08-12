@@ -743,16 +743,15 @@ final class WorkspaceModel {
             session.start()
         }
 
-        markSeen()
         focusActivePane()
     }
 
     /// Clears the debt without answering the agent at all.
     ///
-    /// The same trick as with "done" when a tab is opened: a state is about the
-    /// human's attention, not about the process. Sorted it out in another
-    /// window, answered by hand, changed their mind — the debt is settled. The
-    /// real state of affairs comes back with the agent's very next event.
+    /// A state is about the human's attention, not about the process. Sorted it
+    /// out in another window, answered by hand, changed their mind — the debt is
+    /// settled. The real state of affairs comes back with the agent's very next
+    /// event.
     func markHandled(_ paneID: String) {
         guard let session = sessions[paneID], session.status == .waiting else { return }
 
@@ -760,16 +759,6 @@ final class WorkspaceModel {
         // This goes into the feed on equal terms with hook events: otherwise
         // "waited — then vanished" would look like a failure in the history.
         record(session, byHand: true)
-    }
-
-    /// "Done" fades into rest as soon as the tab is opened: the whole point of
-    /// that state is "the output is written, but nobody has read it".
-    private func markSeen() {
-        guard let tab = activeTab else { return }
-
-        for pane in tab.panes where sessions[pane.id]?.status == .done {
-            sessions[pane.id]?.setStatus(.idle)
-        }
     }
 
     /// The title and the cwd from escape sequences go into the snapshot so that
