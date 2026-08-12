@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Roost is a native macOS workspace for Claude Code sessions: projects, tabs, a
 tree of panes with terminals, agent statuses, a command palette. The terminal is
-SwiftTerm, everything else is ours. There is no README in the repository; the
+SwiftTerm, everything else is ours. The README is for whoever installs it; the
 intent and the history of decisions live in the doc comments on the types.
 
 ## Commands

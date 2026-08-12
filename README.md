@@ -59,6 +59,26 @@ Either way it just opens: the builds are signed with a Developer ID and
 notarised, and the ticket is stapled into the bundle, so Gatekeeper is satisfied
 without asking Apple and without being told anything by hand.
 
+## Update
+
+```sh
+brew update
+brew upgrade --cask roost
+```
+
+`brew update` first is not a formality: without it Homebrew reads its own copy
+of the tap, and the new version is not in it yet.
+
+**Quit Roost first — and not from a pane inside it.** The cask has no `quit`
+stanza, so Homebrew replaces `/Applications/Roost.app` under a running app
+without asking; and quitting Roost takes every PTY with it, including the shell
+that would be running `brew`. So: `⌘Q` (it asks first if an agent is working),
+upgrade from Terminal, then open the app from Finder or the Dock. By hand it is
+the same order — quit, then replace `Roost.app` with the one from the new zip.
+
+Nothing is lost in the meantime. The snapshot brings back the projects, the tabs
+and the pane tree, and every claude pane returns to its own conversation.
+
 ## Requirements
 
 - macOS 14 or newer
