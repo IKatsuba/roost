@@ -54,6 +54,16 @@ final class TerminalSession {
     /// the snapshot is its job, not the session's.
     @ObservationIgnored var onChange: ((TerminalSession) -> Void)?
 
+    /// The pane's terminal has appeared on screen — the active one takes the
+    /// keyboard here.
+    ///
+    /// Focus is claimed by the view's arrival rather than by the command that
+    /// caused it: a split rebuilds the SwiftUI tree, the terminals are taken
+    /// out of the hierarchy and put back, and AppKit answers that by dropping
+    /// the first responder to the window — undoing whatever was set a moment
+    /// earlier. The arrival is the last word, so it is the one that decides.
+    @ObservationIgnored var onAttach: ((TerminalSession) -> Void)?
+
     private var started = false
 
     init(pane: PaneSpec, hooks: AgentHooksConfig?) {
@@ -72,6 +82,10 @@ final class TerminalSession {
         view = PaneTerminalView(frame: .zero)
         view.configureTheme()
         view.processDelegate = self
+        view.onAttach = { [weak self] in
+            guard let self else { return }
+            onAttach?(self)
+        }
     }
 
     @ObservationIgnored private let launch: PaneLaunch
@@ -210,6 +224,15 @@ extension TerminalSession: @preconcurrency LocalProcessTerminalViewDelegate {
 /// `AppDelegate`. Overriding `becomeFirstResponder` is not an option: in
 /// SwiftTerm it is `public`, not `open`.
 final class PaneTerminalView: LocalProcessTerminalView {
+    /// Told that the terminal has landed in a window — this is when the
+    /// keyboard can be handed to it. See `TerminalSession.onAttach`.
+    var onAttach: (() -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { onAttach?() }
+    }
+
     /// SwiftTerm pins an `NSScroller` to its trailing edge and never hides it —
     /// it only enables and disables it. In a pane with nothing to scroll the
     /// knob covers the whole track, and a constantly redrawing agent keeps the
