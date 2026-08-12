@@ -644,10 +644,17 @@ final class WorkspaceModel {
 
     /// Returns focus to the active pane: after the palette, or after closing a
     /// neighbour, the next character would otherwise go nowhere.
+    ///
+    /// A hop through the queue, and not only to let SwiftUI finish laying out:
+    /// the call arrives in the middle of a rebuild — from `viewDidMoveToWindow`
+    /// — and a first responder set there is dropped by the rest of the rebuild.
     func focusActivePane() {
         guard let id = activePaneID, let session = sessions[id] else { return }
         DispatchQueue.main.async {
-            session.view.window?.makeFirstResponder(session.view)
+            guard let window = session.view.window,
+                  window.firstResponder !== session.view
+            else { return }
+            window.makeFirstResponder(session.view)
         }
     }
 
@@ -738,6 +745,10 @@ final class WorkspaceModel {
             let session = TerminalSession(pane: pane, hooks: hooks?.config)
             session.onChange = { [weak self] session in
                 self?.absorb(session)
+            }
+            session.onAttach = { [weak self] session in
+                guard let self, session.paneID == activePaneID else { return }
+                focusActivePane()
             }
             sessions[pane.id] = session
             session.start()
