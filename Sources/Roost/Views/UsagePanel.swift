@@ -24,6 +24,13 @@ struct SpendPanel: View {
     var body: some View {
         let snapshot = model.usage.snapshot
 
+        // Both lists are worked out once. They used to be built inside the
+        // hierarchy — `openSessions` twice over, to ask whether it was empty
+        // and then to walk it — and this body runs whenever any agent says
+        // anything at all: it reads the sessions' own titles and statuses.
+        let open = openSessions(snapshot)
+        let shares = snapshot.shares(of: model.projectPlaces())
+
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 windows(snapshot)
@@ -34,16 +41,16 @@ struct SpendPanel: View {
                     }
                 }
 
-                if !openSessions(snapshot).isEmpty {
+                if !open.isEmpty {
                     Section("SESSIONS", trailing: "OPEN") {
-                        ForEach(openSessions(snapshot), id: \.pane) { row in
+                        ForEach(open, id: \.pane) { row in
                             SessionRow(row: row)
                         }
                     }
                 }
 
                 Section("PROJECTS", trailing: "ALL TIME") {
-                    ForEach(projects(snapshot), id: \.name) { row in
+                    ForEach(shares, id: \.name) { row in
                         Row(name: row.name, tokens: row.usage.total, cost: row.cost, muted: !row.known)
                     }
                 }
@@ -98,6 +105,7 @@ struct SpendPanel: View {
         switch snapshot.trouble {
         case .noCredentials: "no claude login on this machine"
         case .tokenExpired: "token expired — claude code replaces it on its own"
+        case .throttled: "anthropic is rate limiting — waiting it out"
         case .unreachable: "cannot reach anthropic"
         case nil: snapshot.isCounting ? "counting the transcripts…" : nil
         }
@@ -141,56 +149,6 @@ struct SpendPanel: View {
                 )
             }
             .sorted { ($0.cost ?? 0, $0.usage.total) > ($1.cost ?? 0, $1.usage.total) }
-    }
-
-    private struct ProjectShare {
-        let name: String
-        let usage: TokenUsage
-        let cost: Double?
-
-        /// Open in Roost, as opposed to the leftovers of the catalog.
-        let known: Bool
-    }
-
-    private func projects(_ snapshot: UsageSnapshot) -> [ProjectShare] {
-        var remaining = snapshot.byProject
-        var shares: [ProjectShare] = []
-
-        for project in model.projects {
-            // A project's own directory and its worktrees' — one project to a
-            // human, several catalogs to Claude Code.
-            let usage = SessionCatalog.directoryNames(ofProject: project.path)
-                .reduce(TokenUsage.zero) { $0 + (remaining.removeValue(forKey: $1) ?? .zero) }
-
-            guard !usage.isEmpty else { continue }
-            shares.append(
-                ProjectShare(name: project.name, usage: usage, cost: cost(of: project, snapshot), known: true)
-            )
-        }
-
-        shares.sort { $0.usage.total > $1.usage.total }
-
-        // Everything else in one line rather than dropped: the five-hour window
-        // is spent by whatever ran in it, and a human working in a directory
-        // Roost does not have open is owed the difference.
-        let elsewhere = remaining.values.reduce(TokenUsage.zero, +)
-        if !elsewhere.isEmpty {
-            shares.append(
-                ProjectShare(name: "elsewhere", usage: elsewhere, cost: nil, known: false)
-            )
-        }
-
-        return shares
-    }
-
-    /// A project's money is its sessions' added up rather than its tokens
-    /// priced: the tokens are a sum over models, and a sum has no single rate.
-    private func cost(of project: Project, _ snapshot: UsageSnapshot) -> Double {
-        let directories = Set(SessionCatalog.directoryNames(ofProject: project.path))
-        return snapshot.sessions.values
-            .filter { directories.contains($0.project) }
-            .compactMap(\.cost)
-            .reduce(0, +)
     }
 
     private func money(_ cost: Double?) -> String {

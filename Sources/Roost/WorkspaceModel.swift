@@ -20,6 +20,46 @@ final class WorkspaceModel {
     /// a subscription is measured in belongs to the machine, not to a pane.
     let usage = UsageTracker()
 
+    /// Where each project's sessions can be kept — its own catalog and one per
+    /// worktree.
+    ///
+    /// Remembered for half a minute rather than answered every time. The answer
+    /// costs a directory listing per project (`.claude/worktrees`, and a
+    /// symlink resolution for each), and the panel that asks is rebuilt
+    /// whenever any agent says anything — it reads the sessions' own titles. A
+    /// worktree made in between therefore shows up a moment late, which is the
+    /// cheapest thing here to be wrong about.
+    ///
+    /// `@ObservationIgnored`, both of them: the cache is filled during a view's
+    /// body, and a tracked write there would invalidate the very view that
+    /// asked.
+    @ObservationIgnored private var places: [UsageSnapshot.ProjectPlaces] = []
+    @ObservationIgnored private var placesBuilt: Date?
+
+    private static let placesLifetime: TimeInterval = 30
+
+    func projectPlaces(now: Date = Date()) -> [UsageSnapshot.ProjectPlaces] {
+        if let placesBuilt, now.timeIntervalSince(placesBuilt) < Self.placesLifetime {
+            return places
+        }
+
+        places = projects.map {
+            UsageSnapshot.ProjectPlaces(
+                name: $0.name,
+                directories: SessionCatalog.directoryNames(ofProject: $0.path)
+            )
+        }
+        placesBuilt = now
+
+        return places
+    }
+
+    /// Drops the cache above, for the two things that change the answer at
+    /// once: a project added or removed, and a snapshot restored.
+    private func forgetProjectPlaces() {
+        placesBuilt = nil
+    }
+
     var isPaletteOpen = false
 
     /// What to show in the body of the window.
@@ -169,6 +209,7 @@ final class WorkspaceModel {
         let snapshot = store.load()
 
         projects = snapshot.projects
+        forgetProjectPlaces()
         tabs = snapshot.tabs
         activeTabIDs = snapshot.activeTabIDs
         activeProjectID = snapshot.activeProjectID
@@ -321,6 +362,7 @@ final class WorkspaceModel {
         var project = Project(path: path)
         project.rename(to: Project.uniqueName(project.name, among: projects.map(\.name)))
         projects.append(project)
+        forgetProjectPlaces()
         tabs[project.id] = []
         activeProjectID = project.id
 
@@ -341,6 +383,7 @@ final class WorkspaceModel {
         tabs[projectID] = nil
         activeTabIDs[projectID] = nil
         projects.removeAll { $0.id == projectID }
+        forgetProjectPlaces()
 
         if activeProjectID == projectID {
             activeProjectID = projects.first?.id

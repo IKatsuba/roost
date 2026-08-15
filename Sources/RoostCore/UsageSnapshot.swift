@@ -65,6 +65,98 @@ public struct UsageSnapshot: Sendable {
     public var tightest: LimitWindow? {
         limits.max { $0.usedPercent < $1.usedPercent }
     }
+
+    /// A project and the catalogs its sessions can be kept in — its own, and one
+    /// per worktree. One project to a human, several directories to Claude Code.
+    public struct ProjectPlaces: Sendable, Hashable {
+        public let name: String
+        public let directories: [String]
+
+        public init(name: String, directories: [String]) {
+            self.name = name
+            self.directories = directories
+        }
+    }
+
+    /// What one project came to.
+    public struct ProjectShare: Sendable, Hashable {
+        public let name: String
+        public let usage: TokenUsage
+
+        /// Nil when nothing under it could be priced — not zero. See
+        /// [UsageLedger.Session.cost].
+        public let cost: Double?
+
+        /// Open in Roost, as opposed to the leftovers of the catalog.
+        public let known: Bool
+
+        public init(name: String, usage: TokenUsage, cost: Double?, known: Bool) {
+            self.name = name
+            self.usage = usage
+            self.cost = cost
+            self.known = known
+        }
+    }
+
+    /// The projects by what they came to, dearest first, with everything else
+    /// on one line at the end.
+    ///
+    /// One pass over the totals rather than a search per project. The panel
+    /// that shows this is rebuilt whenever any agent says anything — it reads
+    /// the sessions' own titles and statuses — so what used to be a scan of
+    /// every session for every project, twice over (once for the tokens and
+    /// again for the money), ran dozens of times a second.
+    ///
+    /// The leftovers are kept rather than dropped: the five-hour window is
+    /// spent by whatever ran in it, and a human working in a directory Roost
+    /// does not have open is owed the difference.
+    public func shares(of places: [ProjectPlaces]) -> [ProjectShare] {
+        var owner: [String: Int] = [:]
+        for (index, place) in places.enumerated() {
+            for directory in place.directories { owner[directory] = index }
+        }
+
+        var usage = [TokenUsage](repeating: .zero, count: places.count)
+        var elsewhere = TokenUsage.zero
+
+        for (directory, tokens) in byProject {
+            if let index = owner[directory] {
+                usage[index] += tokens
+            } else {
+                elsewhere += tokens
+            }
+        }
+
+        // Money is added up per session rather than by pricing a project's
+        // tokens: the tokens are a sum over models, and a sum has no single
+        // rate.
+        var cost = [Double?](repeating: nil, count: places.count)
+        for session in sessions.values {
+            guard let index = owner[session.project], let priced = session.cost else { continue }
+            cost[index] = (cost[index] ?? 0) + priced
+        }
+
+        var shares = places.indices
+            .filter { !usage[$0].isEmpty }
+            .map {
+                ProjectShare(
+                    name: places[$0].name,
+                    usage: usage[$0],
+                    cost: cost[$0],
+                    known: true
+                )
+            }
+
+        shares.sort { $0.usage.total > $1.usage.total }
+
+        if !elsewhere.isEmpty {
+            shares.append(
+                ProjectShare(name: "elsewhere", usage: elsewhere, cost: nil, known: false)
+            )
+        }
+
+        return shares
+    }
 }
 
 extension UsageLedger {

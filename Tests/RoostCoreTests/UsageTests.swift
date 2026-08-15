@@ -428,6 +428,61 @@ struct UsageTests {
         #expect(ledger.total.output == 653 * 2)
     }
 
+    /// A project is several catalogs to Claude Code — its own and one per
+    /// worktree — and one line to a human. What belongs to no open project is
+    /// owed to them all the same, on the `elsewhere` line.
+    @Test func addsUpAProjectOutOfItsCatalogs() throws {
+        let main = try ledgerFile([line(id: "a", usage: #"{"output_tokens":1000000}"#)])
+        let branch = try ledgerFile([line(id: "b", usage: #"{"output_tokens":2000000}"#)])
+        let stranger = try ledgerFile([line(id: "c", usage: #"{"output_tokens":500000}"#)])
+        defer {
+            for url in [main, branch, stranger] { try? FileManager.default.removeItem(at: url) }
+        }
+
+        var ledger = UsageLedger()
+        ledger.absorb(transcript: main.path, session: "s1", project: "-work")
+        ledger.absorb(transcript: branch.path, session: "s2", project: "-work-tree")
+        ledger.absorb(transcript: stranger.path, session: "s3", project: "-somewhere-else")
+
+        let places = [UsageSnapshot.ProjectPlaces(name: "work", directories: ["-work", "-work-tree"])]
+        let shares = ledger.snapshot().shares(of: places)
+
+        #expect(shares.map(\.name) == ["work", "elsewhere"])
+        #expect(shares[0].usage.output == 3_000_000)
+        #expect(shares[0].known)
+
+        // Priced per session and added up, not by pricing the project's tokens:
+        // opus at $25 per million output, twice over plus once.
+        #expect(shares[0].cost == 75)
+
+        #expect(shares[1].usage.output == 500_000)
+        #expect(shares[1].known == false)
+        #expect(shares[1].cost == nil)
+    }
+
+    /// Dearest first, and a project nothing ran in is left out rather than
+    /// listed at zero.
+    @Test func ordersProjectsByWhatTheyCame() throws {
+        let small = try ledgerFile([line(id: "a", usage: #"{"output_tokens":100}"#)])
+        let large = try ledgerFile([line(id: "b", usage: #"{"output_tokens":900}"#)])
+        defer {
+            try? FileManager.default.removeItem(at: small)
+            try? FileManager.default.removeItem(at: large)
+        }
+
+        var ledger = UsageLedger()
+        ledger.absorb(transcript: small.path, session: "s1", project: "-small")
+        ledger.absorb(transcript: large.path, session: "s2", project: "-large")
+
+        let shares = ledger.snapshot().shares(of: [
+            UsageSnapshot.ProjectPlaces(name: "small", directories: ["-small"]),
+            UsageSnapshot.ProjectPlaces(name: "large", directories: ["-large"]),
+            UsageSnapshot.ProjectPlaces(name: "untouched", directories: ["-untouched"]),
+        ])
+
+        #expect(shares.map(\.name) == ["large", "small"])
+    }
+
     /// Records older than the horizon are let go — the totals keep them, but
     /// holding every reply ever made to answer a question about this afternoon
     /// is not a trade worth making.
