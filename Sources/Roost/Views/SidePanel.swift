@@ -18,12 +18,6 @@ struct SidePanel: View {
 
     private var side: Side { model.sidePanelView }
 
-    /// Age runs in seconds, so the column is driven by a timer rather than by
-    /// changes in the model.
-    @State private var now = Date()
-
-    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
         let queue = model.waitingQueue
 
@@ -43,7 +37,6 @@ struct SidePanel: View {
         }
         .frame(width: 272)
         .background(Palette.chrome)
-        .onReceive(tick) { now = $0 }
     }
 
     // MARK: - Header
@@ -128,7 +121,7 @@ struct SidePanel: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(model.activity) { entry in
-                        FeedRow(model: model, entry: entry, now: now)
+                        FeedRow(model: model, entry: entry)
                     }
                 }
             }
@@ -153,14 +146,19 @@ struct SidePanel: View {
             case .queue:
                 Text("⌘⇧A — jump to first")
                 Spacer()
-                Text(queue.first.map { "\(formatAge($0.age)) idle" } ?? "empty")
-                    .monospacedDigit()
+                if let first = queue.first {
+                    Age(since: first.since, suffix: "idle")
+                } else {
+                    Text("empty")
+                }
             case .feed:
                 Text("newest first")
                 Spacer()
-                Text(model.activity.last.map { "\(formatAge(now.timeIntervalSince($0.at))) back" }
-                    ?? "empty")
-                    .monospacedDigit()
+                if let last = model.activity.last {
+                    Age(since: last.at, suffix: "back")
+                } else {
+                    Text("empty")
+                }
             case .spend:
                 // The one caveat the panel owes a human: a subscription is not
                 // billed per token, so every figure above is what the same work
@@ -184,7 +182,6 @@ struct SidePanel: View {
 private struct FeedRow: View {
     let model: WorkspaceModel
     let entry: WorkspaceModel.Activity
-    let now: Date
 
     @State private var hovered = false
 
@@ -207,9 +204,8 @@ private struct FeedRow: View {
 
             Spacer(minLength: 6)
 
-            Text(formatAge(now.timeIntervalSince(entry.at)))
+            Age(since: entry.at)
                 .font(Typography.label)
-                .monospacedDigit()
                 .foregroundStyle(Palette.faint)
         }
         .padding(.horizontal, 10)
@@ -260,8 +256,7 @@ private struct QueueCard: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 6)
-                Text(formatAge(item.age))
-                    .monospacedDigit()
+                Age(since: item.since)
                     .foregroundStyle(Palette.text)
             }
             .font(Typography.label)

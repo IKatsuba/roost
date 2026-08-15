@@ -11,10 +11,6 @@ import SwiftUI
 struct Overview: View {
     let model: WorkspaceModel
 
-    @State private var now = Date()
-
-    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     /// Below four of these the cards stop being readable, so the strip scrolls
     /// sideways instead of crushing them.
     private let minColumn: CGFloat = 240
@@ -51,7 +47,6 @@ struct Overview: View {
             .scrollIndicators(.never)
         }
         .background(Palette.chrome)
-        .onReceive(tick) { now = $0 }
     }
 }
 
@@ -126,8 +121,7 @@ private struct OverviewCard: View {
                 Text(item.project.name)
                     .lineLimit(1)
                 Spacer(minLength: 6)
-                Text(formatAge(item.age))
-                    .monospacedDigit()
+                Age(since: item.since)
                     .foregroundStyle(Palette.faint)
             }
             .font(Typography.label)

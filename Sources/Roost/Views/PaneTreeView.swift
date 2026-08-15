@@ -41,10 +41,6 @@ private struct PaneLeafView: View {
     let isActive: Bool
     let showsMarker: Bool
 
-    @State private var now = Date()
-
-    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
         HStack(spacing: 0) {
             if showsMarker {
@@ -67,7 +63,6 @@ private struct PaneLeafView: View {
                 }
             }
         }
-        .onReceive(tick) { now = $0 }
     }
 
     /// The strip above a pane answers "what is here and for how long" — without
@@ -85,8 +80,7 @@ private struct PaneLeafView: View {
             Spacer(minLength: 6)
 
             if let session, session.status != .none {
-                Text(formatAge(Date().timeIntervalSince(session.statusChangedAt)))
-                    .monospacedDigit()
+                Age(since: session.statusChangedAt)
                     .foregroundStyle(Palette.faint)
             }
         }

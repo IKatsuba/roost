@@ -240,6 +240,12 @@ final class WorkspaceModel {
         var age: TimeInterval {
             session.map { Date().timeIntervalSince($0.statusChangedAt) } ?? 0
         }
+
+        /// The moment the count is from, for the label that shows it. The age
+        /// above is a number to sort by and is read once per sort; a view wants
+        /// the instant instead, so that it can keep counting from it without
+        /// the whole list being built again every second. See [Age].
+        var since: Date? { session?.statusChangedAt }
     }
 
     var located: [Located] {
