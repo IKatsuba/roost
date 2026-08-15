@@ -85,18 +85,25 @@ public struct UsageLedger: Sendable, Codable {
         }
     }
 
-    /// What the filesystem calls the file at this path right now, or zero when
-    /// there is nothing there to ask about.
-    static func inode(of path: String) -> UInt64 {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-        return (attributes?[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
-    }
+    /// What the filesystem calls the file at this path right now, and how long
+    /// it is — the two halves of "is this still the file we were reading, and
+    /// has anything been added to it?".
+    ///
+    /// One `lstat` rather than `FileManager.attributesOfItem`. Both numbers come
+    /// out of the single struct the kernel fills in, where the dictionary answer
+    /// fetches them by way of `getattrlist`, `listxattr` and a `getxattr` per
+    /// extended attribute, then bridges the lot through `NSDictionary` — and it
+    /// was asked twice per file, over every transcript on the machine, every
+    /// fifteen seconds. That was where most of the scan's time went.
+    ///
+    /// A missing file answers zero for both. That reads as "nothing there"
+    /// without a special case: an offset past the end is what starting over is
+    /// already spelled as.
+    static func state(of path: String) -> (inode: UInt64, size: UInt64) {
+        var info = Foundation.stat()
+        guard lstat(path, &info) == 0 else { return (0, 0) }
 
-    /// How long it is now — the second half of "is this still the file we were
-    /// reading?", for a replacement that kept the inode.
-    static func size(of path: String) -> UInt64? {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-        return (attributes?[.size] as? NSNumber)?.uint64Value
+        return (UInt64(info.st_ino), UInt64(max(info.st_size, 0)))
     }
 
     private var files: [String: File] = [:]
@@ -162,7 +169,7 @@ public struct UsageLedger: Sendable, Codable {
         now: Date = Date()
     ) -> Bool {
         var file = files[path] ?? File(session: session, project: project)
-        let inode = Self.inode(of: path)
+        let state = Self.state(of: path)
 
         // Something else is at this path now — or the file was truncated where
         // a transcript is only ever appended to. Either way what was counted
@@ -171,16 +178,27 @@ public struct UsageLedger: Sendable, Codable {
         //
         // Only this file's own entry is dropped. Its session's other files —
         // the subagents' transcripts — counted their own tokens and keep them.
-        if file.inode != inode || file.offset > (Self.size(of: path) ?? 0) {
-            file = File(session: session, project: project, inode: inode)
+        if file.inode != state.inode || file.offset > state.size {
+            file = File(session: session, project: project, inode: state.inode)
+        }
+
+        file.session = session
+        file.project = project
+
+        // Nothing has been appended since the last pass, which is what nearly
+        // every file answers on nearly every tick: a machine holds thousands of
+        // transcripts and an agent is writing to one of them. The length above
+        // has already said so, and opening the file to hear it again cost an
+        // `open` and a `close` per transcript per tick.
+        guard file.offset < state.size else {
+            files[path] = file
+            return false
         }
 
         let reading = UsageScan.scan(path: path, from: file.offset)
 
         file.offset = reading.offset
-        file.inode = inode
-        file.session = session
-        file.project = project
+        file.inode = state.inode
 
         var fresh: [UsageScan.Record] = []
 

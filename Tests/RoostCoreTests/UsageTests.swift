@@ -283,6 +283,27 @@ struct UsageTests {
         #expect(ledger.sessions["s1"]?.usage.output == 653)
     }
 
+    /// A pass that found the file no longer than it left it reads nothing —
+    /// which is what nearly every file answers on nearly every tick, and the
+    /// reason the file is not opened at all. The length is not enough on its
+    /// own: a replacement is as likely to come out the same length as not, and
+    /// this one has to be counted again rather than taken for a quiet file.
+    @Test func rereadsAFileReplacedAtTheSameLength() throws {
+        let url = try ledgerFile([line(id: "a")])
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var ledger = UsageLedger()
+        ledger.absorb(transcript: url.path, session: "s1", project: "/p")
+
+        // Same lines, same length, written afresh — a different file at the
+        // same path, which `atomically` is exactly what leaves behind.
+        try write([line(id: "b")], to: url)
+        let found = ledger.absorb(transcript: url.path, session: "s1", project: "/p")
+
+        #expect(found)
+        #expect(ledger.sessions["s1"]?.usage.output == 653)
+    }
+
     @Test func pricesASessionAsItGoes() throws {
         let url = try ledgerFile([
             line(id: "a", model: "claude-opus-5", usage: #"{"output_tokens":1000000}"#),
