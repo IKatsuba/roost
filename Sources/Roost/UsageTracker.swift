@@ -19,9 +19,19 @@ final class UsageTracker {
     /// touches what was appended.
     private static let scanEvery: Duration = .seconds(15)
 
-    /// How often the limits are asked for. The same minute the widgets use —
-    /// the numbers move slowly and the request is not free for anybody.
-    private static let askEvery: Duration = .seconds(60)
+    /// How often the limits are asked for.
+    ///
+    /// Two minutes rather than one: the endpoint is rate limited, and Roost is
+    /// not its only caller — Claude Code asks at the same address with the same
+    /// token, once per pane. Asked every minute on a machine running half a
+    /// dozen agents, the answer was `429` more often than not. The percentages
+    /// move over hours; nothing is lost by asking half as often.
+    private static let askEvery: TimeInterval = 120
+
+    /// How long to wait after being turned away, and the ceiling on it. The
+    /// interval doubles per refusal and returns to [askEvery] on the first
+    /// answer — the polite reading of "later" when nobody says how much later.
+    private static let askAtMost: TimeInterval = 15 * 60
 
     /// How often what has been counted is written down. Rarely on purpose: the
     /// file holds a row per reply of the last week, and the numbers it saves
@@ -33,6 +43,7 @@ final class UsageTracker {
 
         work = Task { [weak self] in
             var lastAsked = Date.distantPast
+            var askAgainIn = Self.askEvery
 
             // Far back, so the first pass is written down the moment it
             // finishes: that one costs twelve seconds and a gigabyte, and it is
@@ -46,9 +57,13 @@ final class UsageTracker {
                 // The limits are asked for on the slower clock, and first: the
                 // window's boundaries come from the answer, so a fresh reset
                 // time makes the count that follows land in the right window.
-                if Date().timeIntervalSince(lastAsked) >= 60 {
-                    await self?.askForLimits()
+                if Date().timeIntervalSince(lastAsked) >= askAgainIn {
+                    let turnedAway = await self?.askForLimits() ?? false
                     lastAsked = Date()
+
+                    askAgainIn = turnedAway
+                        ? min(askAgainIn * 2, Self.askAtMost)
+                        : Self.askEvery
                 }
 
                 await self?.catchUp()
@@ -92,9 +107,14 @@ final class UsageTracker {
         if let updated { snapshot = updated }
     }
 
-    private func askForLimits() async {
+    /// Asks, and says whether we were turned away — the caller backs off on
+    /// true. Any trouble counts, not only `429`: a machine with no login and a
+    /// machine off the network both want to be asked less, not more.
+    private func askForLimits() async -> Bool {
         let reading = await UsageLimits.fetch()
         snapshot = await scanner.apply(limits: reading)
+
+        return reading.trouble != nil
     }
 }
 
@@ -181,7 +201,9 @@ private actor UsageScanner {
     }
 
     func apply(limits reading: UsageLimits.Reading) -> UsageSnapshot {
-        limits = reading
+        // The last good answer survives one that brought nothing — see
+        // [UsageLimits.Reading.keeping].
+        limits = reading.keeping(limits)
         return snapshot()
     }
 

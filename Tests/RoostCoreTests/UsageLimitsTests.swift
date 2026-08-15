@@ -104,6 +104,65 @@ struct UsageLimitsTests {
         #expect(UsageLimits.token(inCredentials: Data("not json".utf8)) == nil)
     }
 
+    // MARK: - Holding on to the last good answer
+
+    /// Being turned away is the ordinary case at this address — Claude Code
+    /// asks at it too — and it must not wipe the percentages.
+    @Test func keepsTheWindowsAnAskWasRefused() {
+        let good = UsageLimits.Reading(
+            windows: [LimitWindow(kind: .session, usedPercent: 42)],
+            at: Date(timeIntervalSince1970: 1000)
+        )
+        let refused = UsageLimits.Reading(
+            windows: [],
+            at: Date(timeIntervalSince1970: 1060),
+            trouble: .throttled
+        )
+
+        let shown = refused.keeping(good)
+
+        #expect(shown.windows.map(\.usedPercent) == [42])
+        #expect(shown.trouble == nil)
+
+        // The age is the good answer's, not the refusal's — that is what makes
+        // the figures go stale on time rather than never.
+        #expect(shown.at == good.at)
+    }
+
+    /// Past the staleness mark the old figures stop being worth standing
+    /// behind, and the trouble is told after all.
+    @Test func tellsTheTroubleOnceTheFiguresAreStale() {
+        let good = UsageLimits.Reading(
+            windows: [LimitWindow(kind: .session, usedPercent: 42)],
+            at: Date(timeIntervalSince1970: 1000)
+        )
+        let refused = UsageLimits.Reading(
+            windows: [],
+            at: Date(timeIntervalSince1970: 1000 + 16 * 60),
+            trouble: .throttled
+        )
+
+        #expect(refused.keeping(good).trouble == .throttled)
+        #expect(refused.keeping(good).windows.isEmpty)
+    }
+
+    /// A good answer always wins, and a refusal with nothing behind it is
+    /// still a refusal — a machine that has never logged in has to be told so.
+    @Test func replacesTheReadingWhenThereIsAnAnswer() {
+        let old = UsageLimits.Reading(
+            windows: [LimitWindow(kind: .session, usedPercent: 42)],
+            at: Date(timeIntervalSince1970: 1000)
+        )
+        let fresh = UsageLimits.Reading(
+            windows: [LimitWindow(kind: .session, usedPercent: 71)],
+            at: Date(timeIntervalSince1970: 1060)
+        )
+
+        #expect(fresh.keeping(old).windows.map(\.usedPercent) == [71])
+        #expect(UsageLimits.Reading(trouble: .noCredentials).keeping(UsageLimits.Reading()).trouble
+            == .noCredentials)
+    }
+
     /// `CLAUDE_CONFIG_DIR` moves the whole configuration, credentials with it.
     @Test func followsTheConfiguredDirectory() {
         let moved = UsageLimits.credentialsFile(environment: ["CLAUDE_CONFIG_DIR": "/tmp/elsewhere"])

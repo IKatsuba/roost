@@ -62,6 +62,26 @@ public enum UsageLimits {
             self.at = at
             self.trouble = trouble
         }
+
+        /// This answer, or the last good one when this one brought nothing.
+        ///
+        /// A failed ask used to wipe the percentages, and the panel said
+        /// "cannot reach anthropic" over figures that had been perfectly good a
+        /// minute earlier. The endpoint is rate limited and Roost is not its
+        /// only caller — Claude Code asks at the same address, in the pane next
+        /// door — so being turned away now and then is the ordinary case, not
+        /// a fault worth reporting.
+        ///
+        /// It holds only for a while. Past `staleAfter` the old figures stop
+        /// being worth standing behind, and the trouble is told after all.
+        public func keeping(_ previous: Reading, staleAfter: TimeInterval = 15 * 60) -> Reading {
+            guard trouble != nil,
+                !previous.windows.isEmpty,
+                at.timeIntervalSince(previous.at) < staleAfter
+            else { return self }
+
+            return Reading(windows: previous.windows, at: previous.at, trouble: nil)
+        }
     }
 
     public enum Trouble: String, Sendable {
@@ -71,6 +91,13 @@ public enum UsageLimits {
         /// The token was refused. It expires every few hours; Claude Code
         /// replaces it on its own, so the answer is to wait rather than to act.
         case tokenExpired
+
+        /// Asked too often — `429`. Its own case rather than [unreachable]:
+        /// the network is fine and the token is good, we are simply being told
+        /// to wait, and saying "cannot reach anthropic" sent people looking for
+        /// a problem with their connection. See [UsageTracker] for the backing
+        /// off this is answered with.
+        case throttled
 
         case unreachable
     }
@@ -179,6 +206,9 @@ public enum UsageLimits {
 
             if status == 401 || status == 403 {
                 return Reading(windows: [], trouble: .tokenExpired)
+            }
+            if status == 429 {
+                return Reading(windows: [], trouble: .throttled)
             }
             guard status == 200,
                 let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
