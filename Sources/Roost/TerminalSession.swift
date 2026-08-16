@@ -228,9 +228,45 @@ final class PaneTerminalView: LocalProcessTerminalView {
     /// keyboard can be handed to it. See `TerminalSession.onAttach`.
     var onAttach: (() -> Void)?
 
+    /// Whether the GPU has been asked for already. `viewDidMoveToWindow` fires
+    /// on the way out as well as in, and on every move between windows —
+    /// SwiftTerm rebinds the renderer itself in that case.
+    private var askedForMetal = false
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil { onAttach?() }
+        guard window != nil else { return }
+
+        enableGPURendering()
+        onAttach?()
+    }
+
+    /// Draws the grid on the GPU instead of through CoreGraphics.
+    ///
+    /// On a pane an agent is writing to, drawing was the most expensive thing
+    /// in the app — 8% of a core with two panes running. SwiftTerm invalidates
+    /// only the rows that changed, but an edit touching the bottom row
+    /// invalidates the whole terminal, and the bottom row is where an agent
+    /// writes: every chunk of output rebuilt an attributed string and a CTLine
+    /// for every visible line. The Metal path rasterises glyphs into an atlas
+    /// once and draws the cells as quads.
+    ///
+    /// It has to be asked for after the view is in a window, and it is allowed
+    /// to refuse — no Metal device, a shader that will not compile. Then
+    /// CoreGraphics carries on and the only trace is a line on stderr: a
+    /// terminal that draws the slow way is worth having, an app that will not
+    /// open a pane is not.
+    private func enableGPURendering() {
+        guard !askedForMetal else { return }
+        askedForMetal = true
+
+        do {
+            try setUseMetal(true)
+        } catch {
+            FileHandle.standardError.write(
+                Data("roost: no metal renderer, drawing with coregraphics — \(error)\n".utf8)
+            )
+        }
     }
 
     /// SwiftTerm pins an `NSScroller` to its trailing edge and never hides it —
